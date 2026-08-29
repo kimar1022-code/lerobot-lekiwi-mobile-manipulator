@@ -16,6 +16,7 @@
 | 카메라 | 손목캠 Pecxin-1M-2012V1 / 베이스캠 Arducam |
 | 모터 배터리 | 리튬이온 3S 12.6V (3S2P 21700) |
 | 모터 드라이버 | Waveshare Serial Bus Servo Driver (DC 9~12.6V, USB/UART) |
+| 관제 화면 | 브라우저 웹 GUI (카메라 3대 + 3D 디지털 트윈 + 조종) |
 | 시뮬레이션 | Gazebo (옴니휠+라이다 주행/Nav2 검증용) |
 | 개발 기간 | 2026– |
 
@@ -34,7 +35,13 @@
 조종 (teleop)
 - 데스크탑 ↔ Pi ZMQ 연결, 옴니휠 6방향 주행 확인
 - 리더팔 → 팔로워 팔 미러링(부드러운 램프 시작)
-- 전체 조종(팔 + 주행)은 배터리 충전 후 마무리 예정
+- 전체 조종(팔 + 주행) 동작 확인
+
+웹 관제 화면
+- 카메라 3대(베이스·손목·외부) 동시 스트리밍
+- 실제 STL 로 만든 3D 디지털 트윈 — 로봇 자세를 20Hz 로 따라감
+- 브라우저에서 주행·팔 조종, 관절 각도 직접 입력
+- 연결이 끊기면 화면에 표시하고 자동 재연결
 
 ## 하드웨어
 
@@ -91,7 +98,8 @@ lerobot-lekiwi-mobile-manipulator/
 │   ├── wrist_fix.py          # 손목굽힘 unwrap 재중심
 │   ├── calib_finalize.py     # 캘리 병합/저장/검증
 │   ├── read_batt.py          # 모터 배터리 전압 읽기
-│   └── run_host.sh           # 호스트 데몬 실행
+│   ├── read_ups.py           # 라즈베리파이 UPS 배터리 읽기 (I2C)
+│   └── run_host.sh           # 호스트 데몬 실행 (-b 백그라운드 / -s 상태 / -k 중지)
 ├── desktop/                  # 데스크탑에서 실행 (리더팔 연결)
 │   ├── my_lekiwi_teleop.py   # 전체 조종 (리더팔 + 키보드)
 │   ├── leader_setup_one.py   # 리더팔 모터 ID 등록
@@ -99,9 +107,16 @@ lerobot-lekiwi-mobile-manipulator/
 │   ├── leader_finalize.py    # 리더팔 캘리
 │   ├── wheel_test.py         # 바퀴 6방향 테스트
 │   ├── wheel_test_slow.py    # 바퀴 천천히(관찰용)
-│   └── arm_teleop_test.py    # 팔 미러링만 (헤드리스)
+│   ├── arm_teleop_test.py    # 팔 미러링만 (헤드리스)
+│   └── web/                  # 웹 관제 화면
+│       ├── lekiwi_web.py     # 서버 (카메라 중계 + 조종 API + 워치독)
+│       ├── lekiwi_web.html   # 화면 (3D 트윈 포함)
+│       ├── fetch_meshes.py   # 3D 메시 받아서 브라우저용으로 변환
+│       ├── start_lekiwi.sh   # 웹서버 + 브라우저 한 번에
+│       └── watch_leader.py   # 리더팔 값 실시간 확인 (진단용)
 └── docs/
-    ├── images/               # 로봇 사진
+    ├── images/               # 로봇 사진, 웹 GUI 화면
+    ├── 웹GUI.md               # 웹 관제 화면 상세 (좌표계·각도 변환 함정 정리)
     └── 개발노트.md            # 진행 내역 + 전체 디버깅 기록
 ```
 
@@ -150,6 +165,51 @@ LEKIWI_IP=<pi-ip> python my_lekiwi_teleop.py
 
 부분 확인: 팔만 `arm_teleop_test.py`, 바퀴만(공중에 띄우고) `wheel_test_slow.py`.
 
+## 웹 관제 화면
+
+브라우저 하나에서 카메라 3대를 보면서 로봇을 조종한다. 팔 자세는 실제 STL 로 만든
+3D 모델이 실시간으로 따라간다.
+
+![웹 GUI](docs/images/web-gui.jpg)
+
+https://github.com/kimar1022-code/lerobot-lekiwi-mobile-manipulator/raw/main/docs/media/web-gui-demo.mp4
+
+> 리더팔로 조종하는 모습. 카메라 3대와 3D 트윈이 함께 따라간다. (2배속)
+
+```bash
+# 준비 (처음 한 번만) — 3D 메시를 공개 저장소에서 받아 브라우저용으로 변환
+cd desktop/web && python3 fetch_meshes.py
+
+# 실행
+./start_lekiwi.sh          # 웹서버 + 브라우저
+# 화면의 「전체 시작」 버튼 → Pi 데몬 확인 → 로봇 연결 → 리더팔 연결까지 자동
+```
+
+| 구역 | 내용 |
+| --- | --- |
+| 카메라 | 베이스(Arducam, 180° 보정) / 손목(90° 보정) / 외부 웹캠 |
+| 3D 트윈 | 관절 6축 + 옴니휠 3개가 실제 값을 따라 움직임 |
+| 주행 | 버튼 또는 W/S·A/D·Z/X, 속도 조절 |
+| 팔 | 잠금 / 슬라이더(각도 직접 입력) / 리더팔 미러링 |
+
+### 3D 모델은 URDF 세 개를 합쳐서 만든다
+
+| 부분 | 출처 | 이유 |
+| --- | --- | --- |
+| 베이스·옴니휠 | [SIGRobotics-UIUC/LeKiwi](https://github.com/SIGRobotics-UIUC/LeKiwi) | 베이스 형상 |
+| 팔 6축 | [TheRobotStudio/SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) | **각도 정의가 lerobot 과 일치** |
+| Pin 그리퍼 | [smart-factory-soarm101](https://github.com/kimar1022-code/smart-factory-soarm101) | 실제 장착한 그리퍼 |
+
+팔을 LeKiwi URDF 로 그리면 관절이 실물과 반대로 돈다. 두 URDF 가 다른 도구로
+만들어져 축 규약이 다르기 때문. SO-101 URDF 는 가동범위가 lerobot 캘리브레이션
+값과 거의 일치해(어깨들기 ±97.9° vs ±100°) 부호 보정 없이 그대로 쓸 수 있다.
+
+베이스와 팔을 잇는 변환은 **같은 부품(팔 베이스)을 두 URDF 가 각각 어떻게 놓았는지**
+비교해서 계산한다. `so_base_link = LeKiwi_link · lk_visual · so_visual⁻¹` 로 풀면
+`xyz=[0, 0.0283, 0.007], rpy=[0,0,90°]` 가 나온다. 딱 떨어지는 값이라 시행착오가
+아님을 알 수 있다.
+
+
 ## 트러블슈팅
 
 세팅하며 실제로 부딪혀 해결한 것들 중 핵심만. 전체 기록은 [`docs/개발노트.md`](docs/개발노트.md).
@@ -159,7 +219,10 @@ LEKIWI_IP=<pi-ip> python my_lekiwi_teleop.py
 - **손으로 안 움직이는 그리퍼 캘리** — 기어비 때문에 역구동이 안 되는 그리퍼는 손 기록이 불가능. 모터에 토크를 주고 소폭씩 밀며 위치 변화가 멈추는(스톨) 지점을 양방향으로 찾아 물리 범위를 측정(`gripper_range.py`).
 - **리더팔 통신 두절을 응답코드로 격리** — 전원·점퍼(A=UART/B=USB)·케이블을 다 확인해도 무응답. 핑 응답이 무응답(-6)인지 충돌(-7)인지, `bus.connect()`의 발견 모터 목록에서 특정 ID가 빠지는지로 좁혀, 최종적으로 드라이버 보드 불량으로 판정하고 교체해 해결.
 - **조종 중 모터 간헐 드롭** — 특정 축(때마다 다름)이 버스에서 빠지며 호스트가 죽음. 응답하는 모터에서 버스 전압을 읽어 10.5V(3S 방전 근처)임을 확인, 부하 시 전압 sag로 인한 브라운아웃으로 판단(`read_batt.py`).
-- **바퀴 명령만 보내면 안 움직임** — 호스트의 `send_action`이 x/y/theta.vel 세 키를 항상 요구(옴니휠 역기구학). 팔(.pos)과 바퀴(.vel)를 함께 보내야 정상 동작.
+- **바퀴 명령만 보내면 안 움직임** — 호스트의 `send_action`이 x/y/theta.vel 세 키를 항상 요구(옴니휠 역기구학). 팔(.pos)과 바퀴(.vel)를 함께 보내야 정상 동작. 반대로 **팔 목표값을 빼도 터진다** — `sync_write`가 빈 딕셔너리를 받아 예외. 팔을 안 움직일 때도 현재 자세를 같이 보내야 한다.
+- **3D 팔이 관절 리밋을 넘어 밑판을 뚫음** — 정규화값(-100~100)을 각도로 바꿀 때 엔코더 중앙(2048)을 0°로 잡은 것이 원인. lerobot 의 정의는 **캘리브레이션 범위의 중앙**이 0°다(`(range_min+range_max)/2`). 우리 어깨들기는 중앙이 2980이라 82°나 어긋났다. 그리퍼만 `RANGE_0_100` 이라 계산식이 따로다.
+- **호스트 데몬이 조용히 죽는데 화면은 계속 「연결됨」** — 이미 맺은 ZMQ 연결이라 클라이언트가 눈치채지 못한다. 관측이 2초 이상 안 오면 화면에 표시하고 4초를 넘기면 자동 재연결하도록 워치독을 넣었다. 죽는 원인은 그때마다 달랐다(`Incorrect status packet`, `SerialException`, 시리얼 포트 중복 점유).
+- **라즈베리파이가 통째로 죽어 리더팔까지 멈춤** — 로봇 관측을 기다리며 제어 루프가 막혀 리더팔 읽기 코드까지 도달하지 못한 것. 리더팔 읽기를 로봇 상태와 분리했다. Pi 가 죽은 것은 UPS 배터리 문제로, 보호회로 내장 18650 은 순간 전류에서 차단되어 잔량이 남아도 꺼진다(X1200 은 무보호 셀 권장).
 
 ## 앞으로 할 것
 
@@ -167,8 +230,9 @@ LEKIWI_IP=<pi-ip> python my_lekiwi_teleop.py
 - [x] 팔로워/리더 캘리브레이션
 - [x] 데스크탑↔Pi 연결, 옴니휠 주행 확인
 - [x] 리더팔 → 팔로워 팔 미러링 확인
-- [ ] 배터리 충전 후 전체 조종(팔 + 주행) 마무리
-- [ ] 손목/베이스 카메라 스트리밍 확인
+- [x] 전체 조종(팔 + 주행) 확인
+- [x] 손목/베이스 카메라 스트리밍 확인
+- [x] 웹 관제 화면 + 3D 디지털 트윈
 - [ ] Gazebo에 옴니휠+라이다 URDF 올려 SLAM/Nav2 주행 시뮬 검증 (실물 이관 전)
 - [ ] 조종 시연 데이터 수집 (`lerobot record`)
 - [ ] 수집 데이터로 정책 학습 및 자율 파지 실험

@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEKIWI // CONTROL</title>
+<style>
+  :root{
+    --g:#00ff41; --g2:#7dffa4; --dim:#12a838; --fade:#0a4d1c;
+    --glow:rgba(0,255,65,.6); --bg:#000600; --panel:rgba(0,22,7,.78); --line:#0f6b26;
+    --warn:#ff4b3e; --amber:#ffc93c;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--g);
+    font-family:"DejaVu Sans Mono","Courier New",monospace;
+    font-size:16px;font-weight:600;overflow-x:hidden;
+  }
+  #rain{position:fixed;inset:0;z-index:0;opacity:.2;pointer-events:none}
+  body::after{
+    content:"";position:fixed;inset:0;z-index:99;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px);
+    mix-blend-mode:multiply;
+  }
+  .wrap{position:relative;z-index:1}
+
+  header{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:12px 18px;border-bottom:2px solid var(--line);
+    background:rgba(0,12,4,.9);position:sticky;top:0;z-index:20;
+  }
+  h1{margin:0;font-size:22px;font-weight:800;letter-spacing:4px;
+     text-shadow:0 0 12px var(--glow)}
+  .caret{animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .stat{
+    font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--dim);
+    border:1px solid var(--line);padding:4px 11px;background:rgba(0,255,65,.05);
+  }
+  .stat.on{color:var(--g);border-color:var(--g);text-shadow:0 0 8px var(--glow);
+           box-shadow:0 0 12px rgba(0,255,65,.2)}
+  .stat.off{color:var(--warn);border-color:var(--warn)}
+  .stat.idle{color:var(--amber);border-color:var(--amber)}
+
+  main{padding:16px;max-width:1700px;margin:0 auto}
+  .sect{font-size:14px;font-weight:800;letter-spacing:3px;color:var(--dim);margin:0 0 9px}
+
+  .cams{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-bottom:18px}
+  .cam{border:1px solid var(--line);background:var(--panel);position:relative}
+  .cam h2{
+    margin:0;padding:8px 11px;font-size:13px;font-weight:700;letter-spacing:2px;
+    border-bottom:1px solid var(--line);display:flex;justify-content:space-between;color:var(--g);
+  }
+  .cam h2 .sub{color:var(--dim);font-weight:600}
+  .cam .feed{position:relative;background:#000}
+  .cam img{width:100%;display:block;aspect-ratio:4/3;object-fit:contain;filter:contrast(1.05)}
+  .corner{position:absolute;width:12px;height:12px;border:2px solid var(--g);opacity:.8}
+  .corner.tl{top:-1px;left:-1px;border-right:0;border-bottom:0}
+  .corner.tr{top:-1px;right:-1px;border-left:0;border-bottom:0}
+  .corner.bl{bottom:-1px;left:-1px;border-right:0;border-top:0}
+  .corner.br{bottom:-1px;right:-1px;border-left:0;border-top:0}
+
+  .grid{display:grid;gap:12px;grid-template-columns:330px 1fr 360px}
+  @media(max-width:1250px){.grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+
+  .panel{border:1px solid var(--line);background:var(--panel);padding:15px}
+  .panel h3{
+    margin:0 0 13px;font-size:15px;font-weight:800;letter-spacing:2.5px;
+    border-bottom:1px dashed var(--line);padding-bottom:8px;color:var(--g);
+  }
+
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;max-width:290px;margin:0 auto}
+  .pad button{
+    padding:15px 0;font-family:inherit;font-size:19px;font-weight:800;cursor:pointer;
+    background:rgba(0,255,65,.06);border:1px solid var(--line);color:var(--g);
+    user-select:none;touch-action:manipulation;transition:.07s;
+  }
+  .pad button:hover{border-color:var(--g);background:rgba(0,255,65,.14)}
+  .pad button:active,.pad button.act{
+    background:var(--g);color:#00220a;border-color:var(--g);box-shadow:0 0 18px var(--glow);
+  }
+  .pad .empty{visibility:hidden}
+  .pad .k{display:block;font-size:11px;font-weight:700;color:var(--dim);letter-spacing:1px;margin-top:2px}
+  .pad button.act .k{color:#004d15}
+
+  .sld{display:flex;align-items:center;gap:10px;margin-top:13px;font-size:13px;font-weight:700}
+  .sld input{flex:1}
+  .val{color:var(--g2);min-width:76px;text-align:right;font-weight:800;
+       text-shadow:0 0 6px var(--glow)}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;background:var(--fade);outline:none}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:15px;height:15px;background:var(--g);cursor:pointer;
+    box-shadow:0 0 10px var(--glow);border-radius:0;
+  }
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;background:var(--g);border:0;border-radius:0;cursor:pointer}
+  input[type=range]:disabled::-webkit-slider-thumb{background:var(--fade);box-shadow:none;cursor:not-allowed}
+  input[type=range]:disabled::-moz-range-thumb{background:var(--fade)}
+
+  .joint, .adjrow{margin-bottom:12px}
+  .numin{
+    width:66px;background:rgba(0,255,65,.07);border:1px solid var(--line);color:var(--g);
+    font-family:inherit;font-size:12px;font-weight:800;text-align:right;
+    padding:2px 5px;margin-right:8px;
+  }
+  .numin:focus{outline:none;border-color:var(--g);box-shadow:0 0 8px rgba(0,255,65,.3)}
+  .numin:disabled{opacity:.3;cursor:not-allowed}
+  .btn.big{font-size:15px;padding:12px 22px;letter-spacing:2px}
+  .adjrow label{display:flex;justify-content:space-between;font-size:13px;font-weight:700;
+                margin-bottom:5px;color:var(--g);letter-spacing:1px}
+  .adjrow input[type=range]{width:100%}
+  .joint label{display:flex;justify-content:space-between;font-size:13px;font-weight:700;
+               margin-bottom:5px;color:var(--g);letter-spacing:1px}
+  .joint.locked label{color:var(--dim)}
+
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .btn{
+    padding:9px 15px;font-family:inherit;font-size:13px;font-weight:800;letter-spacing:1.5px;
+    cursor:pointer;background:rgba(0,255,65,.06);border:1px solid var(--line);color:var(--g);
+  }
+  .btn:hover{border-color:var(--g);box-shadow:0 0 10px rgba(0,255,65,.3)}
+  .btn.on{background:var(--g);color:#00220a;box-shadow:0 0 18px var(--glow)}
+  .btn.danger{border-color:var(--warn);color:var(--warn)}
+  .btn.danger:hover{background:var(--warn);color:#000;box-shadow:0 0 16px rgba(255,75,62,.5)}
+  .btn:disabled{opacity:.35;cursor:not-allowed;border-color:var(--fade)}
+  .btn:disabled:hover{box-shadow:none;border-color:var(--fade)}
+
+  #view{width:100%;height:400px;display:block;background:#000306;border:1px solid var(--line)}
+  .viewhint{font-size:12px;font-weight:700;color:var(--dim);text-align:center;
+            margin-top:7px;letter-spacing:1px}
+  .loading{font-size:13px;font-weight:700;color:var(--amber);text-align:center;margin-top:6px}
+
+  .hint{font-size:12.5px;font-weight:600;color:var(--dim);line-height:1.85;margin-top:12px;
+        padding-top:10px;border-top:1px dashed var(--line)}
+  .hint b{color:var(--g2);font-weight:800}
+  kbd{border:1px solid var(--line);padding:1px 6px;color:var(--g);font-size:12px;font-weight:800}
+
+  .warn{border:1px solid var(--warn);color:var(--warn);padding:10px 13px;margin-bottom:13px;
+        font-size:14px;font-weight:700;display:none;background:rgba(255,75,62,.1)}
+
+  .tele{font-size:13px;font-weight:700;line-height:1.95;color:var(--dim);margin-top:9px}
+  .tele b{color:var(--g2);font-weight:800}
+  .tele .lead{color:var(--amber)}
+</style>
+</head>
+<body>
+<canvas id="rain"></canvas>
+
+<div class="wrap">
+<header>
+  <h1>LEKIWI // CONTROL<span class="caret">_</span></h1>
+  <span class="stat" id="conn">LINK ...</span>
+  <span class="stat" id="leadStat">LEADER OFF</span>
+  <span class="stat" id="fps">-- FPS</span>
+  <span class="stat" id="armState">ARM OFF</span>
+</header>
+
+<main>
+  <div class="warn" id="warn"></div>
+
+  <p class="sect">[ VISUAL FEED ]</p>
+  <div class="cams">
+    <div class="cam">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <h2><span>CAM_01 // BELLY</span><span class="sub">ROT 180</span></h2>
+      <div class="feed"><img src="/stream/front" alt="배 카메라"></div>
+    </div>
+    <div class="cam">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <h2><span>CAM_02 // WRIST</span><span class="sub">ROT 90</span></h2>
+      <div class="feed"><img src="/stream/wrist" alt="손목 카메라"></div>
+    </div>
+    <div class="cam">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <h2><span>CAM_03 // EXTERNAL</span><span class="sub">C270</span></h2>
+      <div class="feed"><img src="/stream/desk" alt="데스크탑 웹캠"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3>[ LINK ]</h3>
+      <div class="row">
+        <button class="btn big" id="btnStart">▶ 전체 시작</button>
+      </div>
+      <p class="hint" id="startMsg" style="display:none;margin-top:0;border:0;padding-top:0"></p>
+      <div class="row">
+        <button class="btn" id="btnRobot">ROBOT 연결</button>
+        <button class="btn" id="btnLeader">LEADER 연결</button>
+      </div>
+
+      <h3 style="margin-top:18px">[ DRIVE ]</h3>
+      <div class="pad">
+        <button class="empty"></button>
+        <button data-dir="fwd">▲<span class="k">W</span></button>
+        <button class="empty"></button>
+        <button data-dir="left">◀<span class="k">A</span></button>
+        <button data-dir="stop">■<span class="k">HALT</span></button>
+        <button data-dir="right">▶<span class="k">D</span></button>
+        <button data-dir="rotl">↺<span class="k">Z</span></button>
+        <button data-dir="back">▼<span class="k">S</span></button>
+        <button data-dir="rotr">↻<span class="k">X</span></button>
+      </div>
+      <div class="sld"><span>VEL</span>
+        <input type="range" id="spd" min="0.05" max="0.4" step="0.05" value="0.15">
+        <span class="val" id="spdVal">0.15 m/s</span></div>
+      <div class="sld"><span>ROT</span>
+        <input type="range" id="rot" min="10" max="90" step="10" value="40">
+        <span class="val" id="rotVal">40 °/s</span></div>
+      <div class="hint">
+        <kbd>W</kbd><kbd>S</kbd> 전후 · <kbd>A</kbd><kbd>D</kbd> 게걸음 · <kbd>Z</kbd><kbd>X</kbd> 회전<br>
+        누르는 동안만 이동, 떼면 정지.<br>
+        창을 닫아도 <b>0.6초 뒤 자동 정지</b>.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>[ MODEL // LIVE POSE ]</h3>
+      <canvas id="view"></canvas>
+      <p class="loading" id="loadMsg">STL 메시 불러오는 중...</p>
+      <p class="viewhint">드래그: 시점 회전 · 휠: 확대</p>
+      <details id="adjBox">
+        <summary style="cursor:pointer;font-size:13px;font-weight:800;letter-spacing:1.5px;
+                        color:var(--dim);padding:7px 0">▸ 각도 보정 (실제와 다를 때)</summary>
+        <p class="hint" style="margin-top:4px;border:0;padding-top:2px">
+          실제 팔과 나란히 놓고 <b>화면이 실물과 같아질 때까지</b> 맞춰줘.
+          ± 는 도는 방향, 슬라이더는 기울기. 자동 저장됨.
+        </p>
+        <div id="adjRows"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="adjReset">보정 초기화</button>
+        </div>
+      </details>
+      <div class="tele" id="tele"></div>
+    </div>
+
+    <div class="panel">
+      <h3>[ MANIPULATOR ]</h3>
+      <div class="row">
+        <button class="btn" id="mOff">잠금</button>
+        <button class="btn" id="mManual">슬라이더</button>
+        <button class="btn" id="mLeader">리더팔</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="armSync">SYNC POSE</button>
+        <button class="btn danger" id="eStop">EMERGENCY STOP</button>
+      </div>
+      <div id="joints"></div>
+      <div class="hint">
+        <b>잠금</b> — 팔이 현재 자세를 유지. 아무것도 안 움직임<br>
+        <b>슬라이더</b> — 아래 막대로 관절을 직접 조종<br>
+        <b>리더팔</b> — 리더팔을 손으로 움직이면 그대로 따라옴<br>
+        모드를 켤 때 <b>현재 자세부터 시작</b>하니 튀지 않음.
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "/static/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { STLLoader } from '/static/STLLoader.js';
+
+/* ══════════ 배경 디지털 레인 ══════════ */
+(function(){
+  const c = document.getElementById('rain'), x = c.getContext('2d');
+  const CH = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF<>/\\[]{}=+*';
+  let cols, drops, fs = 16;
+  function size(){
+    c.width = innerWidth; c.height = innerHeight;
+    cols = Math.floor(c.width / fs);
+    drops = Array.from({length: cols}, () => Math.random() * -60);
+  }
+  size(); addEventListener('resize', size);
+  setInterval(() => {
+    x.fillStyle = 'rgba(0,6,0,.09)'; x.fillRect(0,0,c.width,c.height);
+    x.font = 'bold ' + fs + 'px monospace';
+    for(let i=0;i<cols;i++){
+      x.fillStyle = Math.random() > .985 ? '#c8ffd8' : '#00c130';
+      x.fillText(CH[Math.floor(Math.random()*CH.length)], i*fs, drops[i]*fs);
+      if(drops[i]*fs > c.height && Math.random() > .975) drops[i] = 0;
+      drops[i]++;
+    }
+  }, 55);
+})();
+
+/* ══════════ 3D: URDF 구조 + STL 메시 ══════════ */
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({canvas:view, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000306);
+const cam = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
+
+scene.add(new THREE.AmbientLight(0x226633, 1.4));
+const key = new THREE.DirectionalLight(0x66ff99, 1.5); key.position.set(1,2,1.5); scene.add(key);
+const rim = new THREE.DirectionalLight(0x00ff41, .9);  rim.position.set(-1.5,.6,-1); scene.add(rim);
+
+const grid = new THREE.GridHelper(1.4, 20, 0x0f8f2c, 0x063d12);
+grid.position.y = -0.001;
+scene.add(grid);
+
+function fit(){
+  const w = view.clientWidth, h = view.clientHeight || 400;
+  if(view.width !== w || view.height !== h){
+    renderer.setSize(w, h, false);
+    cam.aspect = w / h; cam.updateProjectionMatrix();
+  }
+}
+
+const linkGroups = {};      // URDF 링크이름 -> THREE.Group
+const jointNodes = {};      // URDF 조인트이름 -> {group, axis, lower, upper}
+let modelReady = false;
+
+const MAT = new THREE.MeshStandardMaterial({
+  color:0x0d3d18, emissive:0x02150a, metalness:.25, roughness:.65,
+});
+const WIRE = new THREE.MeshBasicMaterial({
+  color:0x00ff41, wireframe:true, transparent:true, opacity:.22,
+});
+
+async function buildModel(){
+  const spec = await (await fetch('/static/lekiwi_model.json')).json();
+  try { calib = await (await fetch('/static/lekiwi_calib.json')).json(); } catch(e) {}
+  const loader = new STLLoader();
+
+  // 링크 그룹 만들기
+  for(const name of Object.keys(spec.links)) linkGroups[name] = new THREE.Group();
+
+  // 조인트로 부모-자식 연결
+  const childSet = new Set();
+  for(const j of spec.joints){
+    const parent = linkGroups[j.parent], child = linkGroups[j.child];
+    if(!parent || !child) continue;
+    const pivot = new THREE.Group();
+    pivot.position.set(j.xyz[0], j.xyz[1], j.xyz[2]);
+    // URDF 의 rpy 는 Rz·Ry·Rx 순서다. three 기본값(XYZ)으로 두면 조립이 어긋난다.
+    pivot.rotation.set(j.rpy[0], j.rpy[1], j.rpy[2], 'ZYX');
+    pivot.add(child);
+    parent.add(pivot);
+    childSet.add(j.child);
+    // LeKiwi URDF 는 관절이 continuous 타입이다(revolute 만 보면 하나도 안 잡힌다)
+    if(j.type === 'revolute' || j.type === 'continuous'){
+      jointNodes[j.name] = {g: child, axis: j.axis, lower: j.lower, upper: j.upper};
+    }
+  }
+
+  // 루트를 씬에 (URDF 는 Z-up 이라 X 로 -90도 돌려 Y-up 으로)
+  const rootName = Object.keys(linkGroups).find(n => !childSet.has(n));
+  const root = new THREE.Group();
+  root.rotation.x = -Math.PI/2;
+  root.add(linkGroups[rootName]);
+  scene.add(root);
+
+  // 메시 로드
+  const jobs = [];
+  for(const [lname, visuals] of Object.entries(spec.links)){
+    for(const v of visuals){
+      jobs.push(() => new Promise(res => {
+        loader.load('/static/' + (v.dir || 'meshes6') + '/' + v.mesh, geo => {
+          // STL 에 법선이 들어있어 computeVertexNormals 를 부르지 않는다(부품이 많아 비용이 큼)
+          const m = new THREE.Mesh(geo, MAT);
+          m.position.set(v.xyz[0], v.xyz[1], v.xyz[2]);
+          m.rotation.set(v.rpy[0], v.rpy[1], v.rpy[2], 'ZYX');
+          // LeKiwi 의 STL 은 mm 단위라 URDF 에 0.001 배율이 붙어 있다
+          if(v.scale) m.scale.set(v.scale[0], v.scale[1], v.scale[2]);
+          linkGroups[lname].add(m);
+          res();
+        }, undefined, () => res());
+      }));
+    }
+  }
+  const msg = document.getElementById('loadMsg');
+  const BATCH = 6;
+  for(let i = 0; i < jobs.length; i += BATCH){
+    await Promise.all(jobs.slice(i, i + BATCH).map(f => f()));
+    msg.textContent = `STL 불러오는 중... ${Math.min(i+BATCH, jobs.length)}/${jobs.length}`;
+    await new Promise(r => setTimeout(r, 0));   // 화면이 멈추지 않게 한 숨 돌린다
+  }
+  modelReady = true;
+  msg.style.display = 'none';
+}
+
+buildModel().catch(e => {
+  document.getElementById('loadMsg').textContent = '3D 모델 로드 실패: ' + e;
+});
+
+// 시점
+let yaw = 0.9, pitch = 0.35, dist = 0.95, drag = null;
+view.addEventListener('mousedown', e => drag = {x:e.clientX, y:e.clientY});
+addEventListener('mouseup', () => drag = null);
+addEventListener('mousemove', e => {
+  if(!drag) return;
+  yaw   -= (e.clientX - drag.x) * 0.008;
+  pitch -= (e.clientY - drag.y) * 0.008;
+  pitch = Math.max(-0.3, Math.min(1.4, pitch));
+  drag = {x:e.clientX, y:e.clientY};
+});
+view.addEventListener('wheel', e => {
+  e.preventDefault();
+  dist = Math.max(0.3, Math.min(2.5, dist + e.deltaY * 0.0009));
+}, {passive:false});
+
+// 정규화값(-100~100) -> 실제 관절 각도(rad)
+//
+// lerobot 은 이렇게 정규화한다:
+//   norm = ((raw - range_min) / (range_max - range_min)) * 200 - 100
+// 그래서 거꾸로 raw 를 구한 뒤, 엔코더 중앙(2048)을 0도로 보고 각도로 바꾼다.
+// STS3215 는 한 바퀴가 4096 스텝이다.
+let calib = {};
+const STEP = 2 * Math.PI / 4096;
+// lerobot 의 각도 정의(MotorNormMode.DEGREES)를 그대로 쓴다.
+//
+//   mid   = (range_min + range_max) / 2      <- 이 위치가 0도
+//   deg   = (raw - mid) * 360 / 4095
+//
+// 캘리브레이션 범위의 '중앙'이 0도이지 엔코더 중앙(2048)이 아니다.
+// 예를 들어 어깨들기는 중앙이 2980 이라, 2048 을 0도로 보면 80도 넘게 어긋난다.
+const JKEYS = ['arm_shoulder_pan','arm_shoulder_lift','arm_elbow_flex',
+               'arm_wrist_flex','arm_wrist_roll','arm_gripper'];
+
+// 모터가 도는 쪽과 URDF 축이 반대인 관절은 여기서 뒤집는다
+// lerobot 의 각도 정의를 그대로 따르므로 기본은 전부 +1 / 0 이다.
+// 실물과 반대로 도는 관절이 있으면 보정 패널에서 ± 를 눌러 바꾼다.
+// 팔은 SO101 URDF 를 그대로 쓴다. 그 URDF 의 각도 정의가 lerobot 과 같아서
+// (가동범위가 ±97.9° vs ±100° 로 거의 일치) 부호를 뒤집을 필요가 없다.
+const ADJ_DEFAULT = {
+  arm_shoulder_pan:  {sign: 1, off: 0},
+  arm_shoulder_lift: {sign: 1, off: 0},
+  arm_elbow_flex:    {sign: 1, off: 0},
+  arm_wrist_flex:    {sign: 1, off: 0},
+  arm_wrist_roll:    {sign: 1, off: 0},
+  arm_gripper:       {sign: 1, off: 0},
+};
+let adj = {};
+JKEYS.forEach(k => adj[k] = {...ADJ_DEFAULT[k]});
+try{
+  const saved = JSON.parse(localStorage.getItem('lekiwi_adj') || '{}');
+  for(const k of JKEYS) if(saved[k]) adj[k] = saved[k];
+}catch(e){}
+
+// 그리퍼만 0~100 로 정규화된다(나머지 팔 관절은 -100~100)
+const IS_0_100 = {arm_gripper: true};
+
+function toAngle(v, calibKey, jn){
+  const c = calib[calibKey];
+  if(!c) return 0;
+  const a = adj[calibKey] || {sign:1, off:0};
+  let rad;
+
+  if(IS_0_100[calibKey]){
+    // 그리퍼는 0~100 으로 정규화된다. 엔코더 중앙 기준이 맞지 않아
+    // URDF 가동범위에 그대로 펴 주되, 열림/닫힘 방향을 맞춘다.
+    //
+    // PincOpen 은 0° 가 '열림', -48.5°(=URDF lower) 가 '닫힘' 이다
+    // (PincOpenCoupling.cs 실측 확정값). 우리 로봇의 정규화 0 이 '열림' 쪽이라
+    // t 를 뒤집어야 실물과 같은 방향으로 여닫힌다.
+    const t = Math.max(0, Math.min(1, (v ?? 0) / 100));
+    const lo = (jn && jn.lower != null) ? jn.lower : -0.17;   // -48.5° = 닫힘
+    const hi = (jn && jn.upper != null) ? jn.upper :  1.75;   //   0°   = 열림
+    //   정규화 0   -> hi (열림)
+    //   정규화 100 -> lo (닫힘)
+    rad = (hi + t * (lo - hi)) * a.sign + a.off * Math.PI / 180;
+  } else {
+    // 팔 관절: lerobot 의 DEGREES 정의 그대로
+    //   mid = (range_min+range_max)/2 가 0도,  각도 = (raw-mid)*360/4095
+    const span = c.range_max - c.range_min;
+    const raw = c.range_min + (((v ?? 0) + 100) / 200) * span;
+    const mid = (c.range_min + c.range_max) / 2;
+    rad = ((raw - mid) * 360 / 4095) * Math.PI / 180 * a.sign + a.off * Math.PI / 180;
+  }
+
+  // URDF 가 정한 가동범위를 넘지 않게 자른다(판을 뚫고 들어가는 걸 막는다)
+  if(jn && jn.lower !== null && jn.upper !== null){
+    rad = Math.max(jn.lower, Math.min(jn.upper, rad));
+  }
+  return rad;
+}
+
+let pose = {};        // 목표(로봇에서 온 값)
+let shown = {};       // 화면에 그려지는 값 — 목표를 향해 부드럽게 따라간다
+let jointMap = [];
+
+// 세 옴니휠의 배치각에 맞춰 주행 명령을 각 바퀴 회전으로 바꾼다
+const WHEELS = [
+  {j:'base_left_wheel',  a: Math.PI * 4/3},
+  {j:'base_back_wheel',  a: 0},
+  {j:'base_right_wheel', a: Math.PI * 2/3},
+];
+
+function animate(){
+  requestAnimationFrame(animate);
+  fit();
+  if(modelReady){
+    // 바퀴: 지금 주행 명령대로 굴린다
+    const dv = driveVec();
+    for(const w of WHEELS){
+      const jn = jointNodes[w.j];
+      if(!jn) continue;
+      const v = -Math.sin(w.a) * dv.x + Math.cos(w.a) * dv.y + dv.theta * 0.012;
+      jn.spin = (jn.spin || 0) + v * 0.9;
+      jn.g.rotation.set(0,0,0);
+      jn.g.rotateOnAxis(new THREE.Vector3(...jn.axis).normalize(), jn.spin);
+    }
+    for(const jm of jointMap){
+      const jn = jointNodes['arm_' + jm.urdf] || jointNodes[jm.urdf];
+      if(!jn) continue;
+      const tgt = pose[jm.key] ?? 0;
+      if(shown[jm.key] === undefined) shown[jm.key] = tgt;
+      // 프레임마다 목표쪽으로 30%씩 — 폴링이 띄엄띄엄해도 움직임이 매끄럽다
+      shown[jm.key] += (tgt - shown[jm.key]) * 0.3;
+      const ang = toAngle(shown[jm.key], jm.key.replace('.pos',''), jn);
+      jn.g.rotation.set(0,0,0);
+      jn.g.rotateOnAxis(new THREE.Vector3(...jn.axis).normalize(), ang);
+      jn.lastAngle = ang;
+    }
+
+    // PincOpen 은 평행 4절 링크라 실제 구동축은 모터 하나(arm_gripper = 왼쪽 proximal)뿐이고
+    // 나머지 3축은 기계적으로 따라 움직인다. URDF 로는 이 폐루프를 표현할 수 없어 여기서 계산한다.
+    //
+    // 배율·부호는 PincOpenCoupling.cs 의 확정값 (2026-08-01):
+    //   left_distal = -θ,  right_proximal = -θ,  right_distal = +θ   (배율 ×1.0)
+    // ×1.0 에서만 손가락 패드가 서로 평행하게 맞물린다(×0.5 는 끝만 뾰족하게 모임).
+    const COUPLE = {
+      pincopen_left_distal_joint:    -1,
+      pincopen_right_proximal_joint: -1,
+      pincopen_right_distal_joint:   +1,
+    };
+    const gj = jointNodes['arm_gripper'];
+    if(gj){
+      const th = gj.lastAngle || 0;
+      for(const [nm, ratio] of Object.entries(COUPLE)){
+        const jn2 = jointNodes[nm];
+        if(!jn2) continue;
+        jn2.g.rotation.set(0,0,0);
+        jn2.g.rotateOnAxis(new THREE.Vector3(...jn2.axis).normalize(), th * ratio);
+      }
+    }
+
+  }
+  cam.position.set(
+    Math.sin(yaw)*Math.cos(pitch)*dist,
+    Math.sin(pitch)*dist + 0.18,
+    Math.cos(yaw)*Math.cos(pitch)*dist
+  );
+  cam.lookAt(0, 0.16, 0);
+  renderer.render(scene, cam);
+}
+fit(); animate();
+
+/* ══════════ 조종 ══════════ */
+const $ = s => document.querySelector(s);
+let joints = [], armMode = 'off', leaderOn = false;
+let held = new Set();
+const KEYMAP = {w:'fwd', s:'back', a:'left', d:'right', z:'rotl', x:'rotr'};
+
+function driveVec(){
+  const v = +$('#spd').value, r = +$('#rot').value;
+  let x=0,y=0,th=0;
+  if(held.has('fwd'))   x += v;
+  if(held.has('back'))  x -= v;
+  if(held.has('left'))  y += v;
+  if(held.has('right')) y -= v;
+  if(held.has('rotl'))  th += r;
+  if(held.has('rotr'))  th -= r;
+  return {x,y,theta:th};
+}
+async function sendDrive(){
+  try{ await fetch('/api/drive',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(driveVec())}); }catch(e){}
+}
+setInterval(() => { if(held.size) sendDrive(); }, 100);
+
+function paint(){
+  document.querySelectorAll('.pad button[data-dir]').forEach(b =>
+    b.classList.toggle('act', held.has(b.dataset.dir)));
+}
+function press(d){
+  if(d === 'stop'){ held.clear(); paint(); sendDrive(); return; }
+  held.add(d); paint(); sendDrive();
+}
+function release(d){ held.delete(d); paint(); sendDrive(); }
+
+document.querySelectorAll('.pad button[data-dir]').forEach(b => {
+  const d = b.dataset.dir;
+  b.addEventListener('mousedown', e => {e.preventDefault(); press(d);});
+  b.addEventListener('mouseup',   () => release(d));
+  b.addEventListener('mouseleave',() => release(d));
+  b.addEventListener('touchstart',e => {e.preventDefault(); press(d);}, {passive:false});
+  b.addEventListener('touchend',  e => {e.preventDefault(); release(d);});
+});
+addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT') return;
+  const d = KEYMAP[e.key.toLowerCase()];
+  if(d && !e.repeat) press(d);
+});
+addEventListener('keyup', e => {
+  const d = KEYMAP[e.key.toLowerCase()];
+  if(d) release(d);
+});
+addEventListener('blur', () => { held.clear(); paint(); sendDrive(); });
+
+$('#spd').addEventListener('input', e => $('#spdVal').textContent = (+e.target.value).toFixed(2)+' m/s');
+$('#rot').addEventListener('input', e => $('#rotVal').textContent = e.target.value+' °/s');
+
+/* 연결 버튼 */
+async function conn(target, on){
+  await fetch('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({target, on})});
+}
+$('#btnStart').addEventListener('click', async () => {
+  $('#btnStart').disabled = true;
+  try{ await fetch('/api/startup', {method:'POST'}); }catch(e){}
+  setTimeout(() => { $('#btnStart').disabled = false; }, 3000);
+});
+
+$('#btnRobot').addEventListener('click', e =>
+  conn('robot', !e.target.classList.contains('on')));
+$('#btnLeader').addEventListener('click', e =>
+  conn('leader', !e.target.classList.contains('on')));
+
+/* 팔 모드 */
+async function setMode(m){
+  const r = await (await fetch('/api/arm',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:m})})).json();
+  if(r.ok === false && r.msg) alert(r.msg);
+}
+$('#mOff').addEventListener('click', () => setMode('off'));
+$('#mManual').addEventListener('click', () => setMode('manual'));
+$('#mLeader').addEventListener('click', () => setMode('leader'));
+$('#eStop').addEventListener('click', async () => {
+  held.clear(); paint(); await sendDrive(); await setMode('off');
+});
+
+function buildJoints(list, cur){
+  if(joints.length) return;
+  joints = list; jointMap = list;
+  $('#joints').innerHTML = list.map(j => `
+    <div class="joint locked" id="jw_${j.urdf}">
+      <label>
+        <span>${j.label}</span>
+        <span>
+          <input class="numin" type="number" step="0.5" min="-100" max="100"
+                 data-num="${j.urdf}" data-key="${j.key}" disabled>
+          <span class="val" id="v_${j.urdf}">--</span>
+        </span>
+      </label>
+      <input type="range" min="-100" max="100" step="0.5" value="${cur[j.key] ?? 0}"
+             data-key="${j.key}" data-urdf="${j.urdf}" disabled>
+    </div>`).join('');
+  document.querySelectorAll('#joints .joint input[type=range]').forEach(inp => {
+    inp.addEventListener('input', async e => {
+      const k = e.target.dataset.key, v = +e.target.value;
+      const u = e.target.dataset.urdf;
+      document.getElementById('v_'+u).textContent = v.toFixed(1);
+      const num = document.querySelector(`.numin[data-num="${u}"]`);
+      if(num) num.value = v.toFixed(1);
+      pose[k] = v;
+      if(armMode !== 'manual') return;
+      try{ await fetch('/api/arm',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({joints:{[k]:v}})}); }catch(err){}
+    });
+  });
+
+  // 숫자를 직접 쳐서 넣기 (엔터 또는 칸을 벗어날 때 적용)
+  document.querySelectorAll('.numin').forEach(num => {
+    const apply = async () => {
+      let v = parseFloat(num.value);
+      if(isNaN(v)) return;
+      v = Math.max(-100, Math.min(100, v));
+      num.value = v.toFixed(1);
+      const u = num.dataset.num, k = num.dataset.key;
+      const rng = document.querySelector(`#joints input[type=range][data-urdf="${u}"]`);
+      if(rng) rng.value = v;
+      document.getElementById('v_'+u).textContent = v.toFixed(1);
+      pose[k] = v;
+      if(armMode !== 'manual'){
+        alert('팔 모드를 「슬라이더」로 바꿔야 로봇에 전달돼');
+        return;
+      }
+      try{ await fetch('/api/arm',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({joints:{[k]:v}})}); }catch(err){}
+    };
+    num.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); apply(); }});
+    num.addEventListener('blur', apply);
+  });
+}
+async function syncArm(){
+  const r = await (await fetch('/api/state')).json();
+  document.querySelectorAll('#joints .joint input[type=range]').forEach(inp => {
+    const v = r.arm_current[inp.dataset.key];
+    if(v !== undefined){
+      const u = inp.dataset.urdf;
+      inp.value = v;
+      document.getElementById('v_'+u).textContent = v.toFixed(1);
+      const num = document.querySelector(`.numin[data-num="${u}"]`);
+      if(num) num.value = v.toFixed(1);
+    }
+  });
+}
+$('#armSync').addEventListener('click', syncArm);
+
+/* 3D 트윈: 관절값만 빠르게 (20Hz) */
+setInterval(async () => {
+  try{
+    const p = await (await fetch('/api/pose')).json();
+    if(p.c) pose = p.c;
+  }catch(e){}
+}, 50);
+
+/* 각도 보정 패널 */
+(function(){
+  const LABEL = {arm_shoulder_pan:'어깨돌림', arm_shoulder_lift:'어깨들기',
+                 arm_elbow_flex:'팔꿈치', arm_wrist_flex:'손목굽힘',
+                 arm_wrist_roll:'손목돌림', arm_gripper:'그리퍼'};
+  const box = document.getElementById('adjRows');
+  box.innerHTML = JKEYS.map(k => `
+    <div class="adjrow" style="margin-bottom:9px">
+      <label>
+        <span>${LABEL[k]}</span>
+        <span>
+          <button class="btn" data-sign="${k}" style="padding:2px 9px;margin-right:7px">
+            ${adj[k].sign > 0 ? '＋' : '－'}
+          </button>
+          <span class="val" id="ao_${k}">${adj[k].off}°</span>
+        </span>
+      </label>
+      <input type="range" min="-180" max="180" step="1" value="${adj[k].off}" data-off="${k}">
+    </div>`).join('');
+
+  function save(){ localStorage.setItem('lekiwi_adj', JSON.stringify(adj)); }
+
+  box.querySelectorAll('[data-off]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const k = e.target.dataset.off;
+      adj[k].off = +e.target.value;
+      document.getElementById('ao_'+k).textContent = adj[k].off + '°';
+      save();
+    });
+  });
+  box.querySelectorAll('[data-sign]').forEach(b => {
+    b.addEventListener('click', e => {
+      const k = e.target.dataset.sign;
+      adj[k].sign *= -1;
+      e.target.textContent = adj[k].sign > 0 ? '＋' : '－';
+      save();
+    });
+  });
+  document.getElementById('adjReset').addEventListener('click', () => {
+    JKEYS.forEach(k => adj[k] = {...ADJ_DEFAULT[k]});
+    save();
+    location.reload();
+  });
+})();
+
+/* 상태 폴링 */
+setInterval(async () => {
+  try{
+    const r = await (await fetch('/api/state')).json();
+    leaderOn = r.leader_connected;
+    armMode = r.arm_mode;
+
+    // 관측이 끊긴 지 오래면 '연결됨' 이어도 응답 없음으로 보여준다
+    const stale = r.connected && r.obs_age > 2;
+    $('#conn').textContent = stale ? `NO RESPONSE ${r.obs_age}s`
+                          : (r.connected ? 'ROBOT LINKED'
+                          : (r.want_robot ? 'RECONNECTING...' : 'ROBOT OFF'));
+    $('#conn').className = 'stat ' + (stale ? 'off'
+                          : (r.connected ? 'on' : (r.want_robot ? 'idle' : 'off')));
+    $('#leadStat').textContent = r.leader_connected ? 'LEADER LINKED' : 'LEADER OFF';
+    $('#leadStat').className = 'stat ' + (r.leader_connected ? 'on' : '');
+    $('#fps').textContent = r.fps.toFixed(0) + ' FPS';
+
+    const MODE_TXT = {off:'ARM LOCKED', manual:'ARM // SLIDER', leader:'ARM // LEADER'};
+    $('#armState').textContent = MODE_TXT[r.arm_mode];
+    $('#armState').className = 'stat ' + (r.arm_mode === 'off' ? '' : 'on');
+
+    $('#btnRobot').textContent = r.want_robot ? 'ROBOT 연결됨' : 'ROBOT 연결';
+    $('#btnRobot').classList.toggle('on', r.connected);
+    $('#btnLeader').textContent = r.want_leader ? 'LEADER 연결됨' : 'LEADER 연결';
+    $('#btnLeader').classList.toggle('on', r.leader_connected);
+
+    ['off','manual','leader'].forEach(m => {
+      const b = $('#m'+m[0].toUpperCase()+m.slice(1));
+      if(b) b.classList.toggle('on', r.arm_mode === m);
+    });
+    $('#mLeader').disabled = !r.leader_connected;
+
+    // 원클릭 시작 진행 상황
+    const sm = $('#startMsg');
+    if(r.startup_msg){ sm.textContent = '▸ ' + r.startup_msg; sm.style.display = 'block'; }
+    else sm.style.display = 'none';
+
+    if(r.joints?.length) buildJoints(r.joints, r.arm_current || {});
+
+
+    const manual = (r.arm_mode === 'manual');
+    document.querySelectorAll('.numin').forEach(x => x.disabled = !manual);
+    document.querySelectorAll('#joints .joint input[type=range]').forEach(inp => {
+      inp.disabled = !manual;
+      const u = inp.dataset.urdf;
+      document.getElementById('jw_'+u).classList.toggle('locked', !manual);
+      if(!manual){
+        const v = r.arm_current[inp.dataset.key];
+        if(v !== undefined){
+          inp.value = v;
+          document.getElementById('v_'+u).textContent = v.toFixed(1);
+          const num = document.querySelector(`.numin[data-num="${u}"]`);
+          if(num && document.activeElement !== num) num.value = v.toFixed(1);
+        }
+      }
+    });
+
+    $('#tele').innerHTML = (r.joints || []).map(j => {
+      const cur = (r.arm_current[j.key] ?? 0).toFixed(1);
+      const ld  = r.leader_connected ? ` <span class="lead">◂ ${(r.leader_pose[j.key] ?? 0).toFixed(1)}</span>` : '';
+      return `${j.label} <b>${cur}</b>${ld}`;
+    }).join('<br>');
+
+    const w = $('#warn');
+    const msg = [r.error, r.leader_error].filter(Boolean).join(' / ');
+    if(msg){ w.textContent = '// ' + msg; w.style.display='block'; }
+    else w.style.display='none';
+  }catch(e){
+    $('#conn').textContent = 'SERVER DOWN';
+    $('#conn').className = 'stat off';
+  }
+}, 500);
+</script>
+</body>
+</html>

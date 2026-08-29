@@ -4,3 +4,6 @@ __pycache__/
 *.cache
 *.lock
 /tmp/
+
+# 3D 메시는 fetch_meshes.py 로 받아서 만든다
+desktop/web/static/
