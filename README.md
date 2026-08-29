@@ -170,9 +170,9 @@ LEKIWI_IP=<pi-ip> python my_lekiwi_teleop.py
 브라우저 하나에서 카메라 3대를 보면서 로봇을 조종한다. 팔 자세는 실제 STL 로 만든
 3D 모델이 실시간으로 따라간다.
 
-[![웹 GUI](docs/images/web-gui.jpg)](https://youtu.be/RbKLVp3t7v8)
+<a href="https://youtu.be/RbKLVp3t7v8"><img src="docs/demo/demo-thumb.png" alt="LeKiwi 웹 관제 데모 (YouTube)" width="100%" /></a>
 
-▶ **[영상으로 보기 (YouTube)](https://youtu.be/RbKLVp3t7v8)** — 리더팔로 조종하는 모습. 카메라 3대와 3D 트윈이 함께 따라간다. (2배속)
+리더팔로 조종하는 모습. 카메라 3대와 3D 트윈이 함께 따라간다.
 
 ```bash
 # 준비 (처음 한 번만) — 3D 메시를 공개 저장소에서 받아 브라우저용으로 변환
