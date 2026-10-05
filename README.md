@@ -6,7 +6,7 @@
 
 <img src="docs/images/lekiwi.png" alt="LeKiwi" width="100%" />
 
-| 항목 <img src="docs/images/layout/w100.png" width="100%" height="1"> | 사양 <img src="docs/images/layout/w600.png" width="100%" height="1"> |
+| 항목 <img src="docs/images/layout/w450.png" width="100%" height="1"> | 사양 <img src="docs/images/layout/w2550.png" width="100%" height="1"> |
 | --- | --- |
 | 로봇팔 | SO-101 팔로워, Feetech STS3215 × 6 |
 | 그리퍼 | Pin Gripper |
@@ -58,7 +58,7 @@
 
 팔 각도를 매번 역기구학으로 푸는 대신, **옴니휠로 몸 전체를 움직여 블록이 손목캠의 같은 자리에 오게** 만들고, 팔은 리더팔로 가르친 자세(보기 · 집기 · 넣기)만 반복한다. 옴니휠은 앞뒤 · 좌우 · 회전이 독립이라 화면 오차를 그대로 바퀴 명령으로 바꿀 수 있다.
 
-| 단계 <img src="docs/images/layout/w100.png" width="100%" height="1"> | 카메라 <img src="docs/images/layout/w100.png" width="100%" height="1"> | 방법 <img src="docs/images/layout/w500.png" width="100%" height="1"> |
+| 단계 <img src="docs/images/layout/w450.png" width="100%" height="1"> | 카메라 <img src="docs/images/layout/w450.png" width="100%" height="1"> | 방법 <img src="docs/images/layout/w2050.png" width="100%" height="1"> |
 | --- | --- | --- |
 | 찾기 · 다가가기 | 베이스캠 | HSV 색 검출, 화면 중심 오차로 회전하며 전진 |
 | 정렬 | 손목캠 | 3cm 이동 시 화면 이동량을 스스로 측정 → 오차를 바퀴 이동으로 환산 |
@@ -76,7 +76,7 @@ cd desktop/pick && python auto_pick.py red yellow
 
 옴니휠 3륜 베이스 위에 SO-101 팔로워 팔을 올린 구성. 베이스에 라즈베리파이 5와 모터 드라이버, 3S 리튬이온 배터리를 실었고, 손목과 베이스에 카메라를 두었다. 조종은 같은 STS3215로 만든 SO-101 리더팔을 데스크탑에 USB로 연결해서 한다.
 
-| <img src="docs/images/layout/w100.png" width="100%" height="1"> | <img src="docs/images/layout/w100.png" width="100%" height="1"> |
+| <img src="docs/images/layout/w1500.png" width="100%" height="1"> | <img src="docs/images/layout/w1500.png" width="100%" height="1"> |
 | --- | --- |
 | <img src="docs/images/lekiwi-1.png" alt="" width="100%" /> | <img src="docs/images/lekiwi-2.png" alt="" width="100%" /> |
 | <img src="docs/images/lekiwi-3.png" alt="" width="100%" /> | <img src="docs/images/lekiwi.png" alt="" width="100%" /> |
@@ -225,7 +225,7 @@ cd desktop/web && python3 fetch_meshes.py
 # 화면의 「전체 시작」 버튼 → Pi 데몬 확인 → 로봇 연결 → 리더팔 연결까지 자동
 ```
 
-| 구역 <img src="docs/images/layout/w100.png" width="100%" height="1"> | 내용 <img src="docs/images/layout/w400.png" width="100%" height="1"> |
+| 구역 <img src="docs/images/layout/w350.png" width="100%" height="1"> | 내용 <img src="docs/images/layout/w2650.png" width="100%" height="1"> |
 | --- | --- |
 | 카메라 | 베이스(Arducam, 180° 보정) / 손목(90° 보정) / 외부 웹캠 |
 | 3D 트윈 | 관절 6축 + 옴니휠 3개가 실제 값을 따라 움직임 |
@@ -234,7 +234,7 @@ cd desktop/web && python3 fetch_meshes.py
 
 ### 3D 모델은 URDF 세 개를 합쳐서 만든다
 
-| 부분 <img src="docs/images/layout/w100.png" width="100%" height="1"> | 출처 <img src="docs/images/layout/w200.png" width="100%" height="1"> | 이유 <img src="docs/images/layout/w200.png" width="100%" height="1"> |
+| 부분 <img src="docs/images/layout/w700.png" width="100%" height="1"> | 출처 <img src="docs/images/layout/w1100.png" width="100%" height="1"> | 이유 <img src="docs/images/layout/w1250.png" width="100%" height="1"> |
 | --- | --- | --- |
 | 베이스 · 옴니휠 | [SIGRobotics-UIUC/LeKiwi](https://github.com/SIGRobotics-UIUC/LeKiwi) | 베이스 형상 |
 | 팔 6축 | [TheRobotStudio/SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) | **각도 정의가 lerobot 과 일치** |
