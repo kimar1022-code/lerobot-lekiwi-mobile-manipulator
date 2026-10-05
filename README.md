@@ -83,29 +83,7 @@ cd desktop/pick && python auto_pick.py red yellow
 
 ## 구조
 
-```mermaid
-flowchart LR
-    subgraph Desktop["데스크탑 (PC)"]
-        Leader[SO-101 리더팔<br/>USB 시리얼]
-        KB[키보드 텔레옵]
-        Client[LeKiwiClient<br/>my_lekiwi_teleop.py]
-    end
-    subgraph Pi["라즈베리파이 5 (LeKiwi)"]
-        Host[lekiwi_host 데몬]
-        Bus[Feetech STS 버스]
-        Cams[손목 / 베이스 카메라]
-    end
-    ArmM[(팔 모터 x6)]
-    WheelM[(옴니휠 모터 x3)]
-
-    Leader -->|관절 위치| Client
-    KB -->|주행 명령| Client
-    Client <-->|ZMQ 5555/5556| Host
-    Host --> Bus
-    Bus --> ArmM
-    Bus --> WheelM
-    Cams --> Host
-```
+<img src="docs/images/architecture.png" alt="LeKiwi 구성도" width="100%" />
 
 작업에서 지킨 것:
 
