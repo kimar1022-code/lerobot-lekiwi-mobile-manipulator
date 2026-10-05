@@ -52,9 +52,9 @@
 
 ## 자율 집기
 
-![자율 집기 데모](docs/demo/autopick.gif)
+<a href="https://youtu.be/ivkX3ZNEQ3s"><img src="docs/demo/autopick.gif" alt="LeKiwi 자율 집기 데모 (YouTube)" width="100%" /></a>
 
-바닥의 블록을 찾아 집고 보관함에 넣는 전 과정(3배속). 전체 영상: [`docs/media/autopick-red.mp4`](docs/media/autopick-red.mp4)
+바닥의 블록을 찾아 집고 보관함에 넣는 전 과정(3배속 미리보기). 이미지를 누르면 전체 영상(YouTube)으로 이동한다.
 
 팔 각도를 매번 역기구학으로 푸는 대신, **옴니휠로 몸 전체를 움직여 블록이 손목캠의 같은 자리에 오게** 만들고, 팔은 리더팔로 가르친 자세(보기·집기·넣기)만 반복한다. 옴니휠은 앞뒤·좌우·회전이 독립이라 화면 오차를 그대로 바퀴 명령으로 바꿀 수 있다.
 
