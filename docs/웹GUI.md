@@ -15,7 +15,7 @@ cd ~/lerobot && ./.venv/bin/python lekiwi_web.py
 http://localhost:8080
 ```
 
-같은 공유기에 붙은 폰·태블릿에서도 `http://192.168.75.137:8080` 으로 접속 가능.
+같은 공유기에 붙은 폰 · 태블릿에서도 `http://192.168.75.137:8080` 으로 접속 가능.
 
 ## 화면
 
@@ -44,7 +44,7 @@ http://localhost:8080
 - `ARM UNLOCK` 을 눌러야 슬라이더가 로봇에 전달됨
 - 켤 때 **현재 자세를 읽어와서** 시작하므로 갑자기 튀지 않음
 - 리더팔로 조종할 거면 여긴 잠근 채로 둘 것
-- `EMERGENCY STOP` — 바퀴 정지 + 팔 잠금
+- `EMERGENCY STOP` - 바퀴 정지 + 팔 잠금
 
 ## 안전 장치
 
@@ -54,18 +54,18 @@ http://localhost:8080
 
 ## 만들면서 걸렸던 것 (다시 겪지 말 것)
 
-1. **`pynput` 미설치** — 키보드 주행 쓰는 스크립트를 처음 돌려서 드러남.
+1. **`pynput` 미설치** - 키보드 주행 쓰는 스크립트를 처음 돌려서 드러남.
    `VIRTUAL_ENV=~/lerobot/.venv uv pip install pynput`
-2. **`rerun-sdk` 미설치 + 뷰어 PATH** — 파이썬 패키지만으론 부족하고
+2. **`rerun-sdk` 미설치 + 뷰어 PATH** - 파이썬 패키지만으론 부족하고
    실행파일이 `~/lerobot/.venv/bin/rerun` 에 있어 PATH에 넣어야 함.
    (이 GUI를 쓰면 rerun 자체가 필요 없음)
-3. **`send_action` 은 팔 목표값이 반드시 있어야 함** — 바퀴 값만 보내면
+3. **`send_action` 은 팔 목표값이 반드시 있어야 함** - 바퀴 값만 보내면
    `sync_write` 가 빈 딕셔너리로 터지고 Pi 로그에 `Message fetching failed` 가 쏟아짐.
    팔을 안 움직일 때도 **현재 자세를 같이 보내야** 한다.
-4. **카메라는 numpy 배열(RGB)로 옴** — 이름이 `jpeg` 라 헷갈리지만
+4. **카메라는 numpy 배열(RGB)로 옴** - 이름이 `jpeg` 라 헷갈리지만
    `LeKiwiClient` 가 디코딩해서 준다. `if frame:` 로 판정하면
    "truth value of an array is ambiguous" 예외.
-5. **HTML id 에 점(`.`)** — 관절 키가 `arm_shoulder_pan.pos` 라
+5. **HTML id 에 점(`.`)** - 관절 키가 `arm_shoulder_pan.pos` 라
    `querySelector('#v_arm_shoulder_pan.pos')` 가 "id + class" 로 해석돼 `null`.
    `getElementById` 를 쓸 것.
 6. **`my_lekiwi_teleop.py` 의 기본 IP 가 옛 주소(.107)** 였음 → `.20` 으로 수정함.
@@ -107,7 +107,7 @@ FRONT_ROTATE_180 = True      # 배 카메라 뒤집힘 보정
 
 로컬 보관 위치: `static/lekiwi_full.urdf`, `static/meshes6/`, `static/lekiwi_model.json`
 
-### 각도 변환 — 여기서 제일 많이 틀렸다
+### 각도 변환 - 여기서 제일 많이 틀렸다
 
 lerobot 이 관절값을 각도로 바꾸는 정의(`MotorNormMode.DEGREES`)를 그대로 따라야 한다:
 
@@ -150,7 +150,7 @@ raw = range_min + (norm / 100)         * (range_max - range_min)     # 그리퍼
 브라우저에 저장되며(`localStorage`), 잘 맞은 값은 `lekiwi_web.html` 의 `ADJ_DEFAULT` 에 옮겨
 기본값으로 만들면 다른 PC 에서도 바로 맞는다.
 
-## 3D 모델 구성 — 두 URDF 를 합쳤다 (2026-08-29 최종)
+## 3D 모델 구성 - 두 URDF 를 합쳤다 (2026-08-29 최종)
 
 ```
 베이스(옴니휠 3개, 플레이트, Pi 케이스)  <-  LeKiwi URDF
@@ -182,7 +182,7 @@ LeKiwi URDF 하나로 하면 **관절 부호가 실물과 반대로 나온다.**
 메시가 같은 자리에 오려면
 `so_base_link = LeKiwi_link * lk_visual * so_visual⁻¹`
 
-계산 결과 **xyz=[0, 0.0283, 0.007], rpy=[0, 0, 90°]** — 딱 떨어지는 값이라
+계산 결과 **xyz=[0, 0.0283, 0.007], rpy=[0, 0, 90°]** - 딱 떨어지는 값이라
 시행착오가 아니라 정답임을 알 수 있다.
 
 ### 메시
