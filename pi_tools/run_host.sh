@@ -3,7 +3,7 @@
 #
 # 사용법:
 #   ~/lekiwi_tools/run_host.sh          앞에서 실행 (화면에 로그가 보임)
-#   ~/lekiwi_tools/run_host.sh -b       뒤에서 실행 (SSH 끊어도 유지)
+#   ~/lekiwi_tools/run_host.sh -b       뒤에서 실행 (SSH 끊어도 유지, 죽으면 자동 재시작)
 #   ~/lekiwi_tools/run_host.sh -s       상태 확인
 #   ~/lekiwi_tools/run_host.sh -k       중지
 #
@@ -17,18 +17,22 @@ LOG=~/lekiwi_host.log
 
 case "${1:-}" in
   -s|--status)
-    if pgrep -f lekiwi_host > /dev/null; then
-      echo "돌고 있음 (PID $(pgrep -f lekiwi_host | tr '\n' ' '))"
+    pgrep -f host_watchdog > /dev/null && echo "자동 재시작 감시: 켜짐" || echo "자동 재시작 감시: 꺼짐"
+    [ -f ~/lekiwi_restarts.log ] && { echo "--- 최근 재시작 ---"; tail -3 ~/lekiwi_restarts.log; }
+    if pgrep -f '^./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host' > /dev/null; then
+      echo "돌고 있음 (PID $(pgrep -f '^./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host' | tr '\n' ' '))"
       echo "--- 로그 마지막 10줄 ---"; tail -10 "$LOG" 2>/dev/null
     else
       echo "안 돌고 있음"
     fi
     exit 0 ;;
   -k|--kill)
+    pkill -f host_watchdog 2>/dev/null || true   # 감시부터 꺼야 다시 안 살아남
     pkill -f lekiwi_host && echo "중지함" || echo "돌고 있지 않았음"
     exit 0 ;;
 esac
 
+pkill -f host_watchdog 2>/dev/null || true
 pkill -f lekiwi_host 2>/dev/null || true
 sleep 1
 
@@ -36,9 +40,10 @@ CMD=(./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host
      --robot.id="$ROBOT_ID" --host.connection_time_s="$CONN_TIME")
 
 if [ "${1:-}" = "-b" ] || [ "${1:-}" = "--background" ]; then
-  setsid nohup "${CMD[@]}" > "$LOG" 2>&1 < /dev/null &
+  : > "$LOG"
+  setsid nohup ~/lekiwi_tools/host_watchdog.sh "${CMD[@]}" > /dev/null 2>&1 < /dev/null &
   sleep 6
-  if pgrep -f lekiwi_host > /dev/null; then
+  if pgrep -f '^./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host' > /dev/null; then
     echo "백그라운드로 시작됨 (연결시간 ${CONN_TIME}초)"
     echo "로그: tail -f $LOG"
     tail -8 "$LOG" 2>/dev/null

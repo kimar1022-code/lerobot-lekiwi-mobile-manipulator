@@ -336,24 +336,41 @@ def to_jpeg(frame, rotate: int = 0):
 
 
 # ─── 데스크탑 웹캠 ───────────────────────────────────────────────────
-def desk_cam_loop():
-    cap = cv2.VideoCapture(DESK_CAM)
+def open_desk_cam():
+    # USB 를 다시 꽂으면 /dev/videoN 번호가 바뀐다 → 이름(by-id)으로 먼저 찾는다
+    ids = sorted(glob.glob("/dev/v4l/by-id/*C270*-video-index0"))
+    cap = cv2.VideoCapture(ids[0] if ids else DESK_CAM, cv2.CAP_V4L2)
     if not cap.isOpened():
-        return
+        return None
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    try:
-        while not S.stop:
-            ok, img = cap.read()
-            if not ok:
-                time.sleep(0.1)
+    return cap
+
+
+def desk_cam_loop():
+    cap, fails = None, 0
+    while not S.stop:
+        if cap is None:
+            cap = open_desk_cam()
+            if cap is None:
+                time.sleep(2)
                 continue
-            ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if ok:
+        ok, img = cap.read()
+        if not ok:
+            fails += 1
+            if fails > 20:          # 약 2초 연속 실패 = 빠졌다 → 닫고 다시 찾기
+                cap.release(); cap, fails = None, 0
                 with S.lock:
-                    S.frames["desk"] = buf.tobytes()
-            time.sleep(1.0 / 20)
-    finally:
+                    S.frames["desk"] = None     # 멈춘 화면 대신 빈 화면
+            time.sleep(0.1)
+            continue
+        fails = 0
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if ok:
+            with S.lock:
+                S.frames["desk"] = buf.tobytes()
+        time.sleep(1.0 / 20)
+    if cap is not None:
         cap.release()
 
 
