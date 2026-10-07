@@ -105,6 +105,13 @@
   }
   .numin:focus{outline:none;border-color:var(--g);box-shadow:0 0 8px rgba(0,255,65,.3)}
   .numin:disabled{opacity:.3;cursor:not-allowed}
+  .steps{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+  .steps span{border:1px solid var(--line);padding:6px 12px;font-size:13px;font-weight:700;color:var(--dim)}
+  .steps span.on{background:var(--g);color:#00220a;box-shadow:0 0 14px var(--glow)}
+  .steps span.done{border-color:var(--g);color:var(--g)}
+  #autoLog{font-size:12px;line-height:1.6;color:var(--g2);background:rgba(0,0,0,.35);border:1px solid var(--line);
+           padding:8px 10px;max-height:230px;overflow:auto;white-space:pre-wrap;margin:8px 0 0}
+  .autoopt{font-size:13px;font-weight:700;color:var(--dim);display:flex;align-items:center;gap:6px}
   .btn.big{font-size:15px;padding:12px 22px;letter-spacing:2px}
   .adjrow label{display:flex;justify-content:space-between;font-size:13px;font-weight:700;
                 margin-bottom:5px;color:var(--g);letter-spacing:1px}
@@ -121,6 +128,9 @@
   .btn:hover{border-color:var(--g);box-shadow:0 0 10px rgba(0,255,65,.3)}
   .btn.on{background:var(--g);color:#00220a;box-shadow:0 0 18px var(--glow)}
   .btn.danger{border-color:var(--warn);color:var(--warn)}
+  .odombar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:13px}
+  .odombar span{flex:1;min-width:180px;color:var(--g);font-family:monospace}
+  .odombar .btn{padding:5px 10px;font-size:12px}
   .btn.danger:hover{background:var(--warn);color:#000;box-shadow:0 0 16px rgba(255,75,62,.5)}
   .btn:disabled{opacity:.35;cursor:not-allowed;border-color:var(--fade)}
   .btn:disabled:hover{box-shadow:none;border-color:var(--fade)}
@@ -153,6 +163,9 @@
   <span class="stat" id="leadStat">LEADER OFF</span>
   <span class="stat" id="fps">-- FPS</span>
   <span class="stat" id="armState">ARM OFF</span>
+  <span class="stat" id="piStat">PI ...</span>
+  <span class="stat" id="upsStat">PI BATT ...</span>
+  <span class="stat" id="motStat">MOTOR BATT ...</span>
 </header>
 
 <main>
@@ -164,19 +177,19 @@
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
       <h2><span>CAM_01 // BELLY</span><span class="sub">ROT 180</span></h2>
-      <div class="feed"><img src="/stream/front" alt="배 카메라"></div>
+      <div class="feed"><img data-src="/stream/front" alt="배 카메라"></div>
     </div>
     <div class="cam">
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
       <h2><span>CAM_02 // WRIST</span><span class="sub">ROT 90</span></h2>
-      <div class="feed"><img src="/stream/wrist" alt="손목 카메라"></div>
+      <div class="feed"><img data-src="/stream/wrist" alt="손목 카메라"></div>
     </div>
     <div class="cam">
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
       <h2><span>CAM_03 // EXTERNAL</span><span class="sub">C270</span></h2>
-      <div class="feed"><img src="/stream/desk" alt="데스크탑 웹캠"></div>
+      <div class="feed"><img data-src="/stream/desk" alt="데스크탑 웹캠"></div>
     </div>
   </div>
 
@@ -221,7 +234,12 @@
       <h3>[ MODEL // LIVE POSE ]</h3>
       <canvas id="view"></canvas>
       <p class="loading" id="loadMsg">STL 메시 불러오는 중...</p>
-      <p class="viewhint">드래그: 시점 회전 · 휠: 확대</p>
+      <p class="viewhint">드래그: 시점 회전 · 휠: 확대 · 노란 선: 지나온 길(바퀴로 잰 값이라 미끄러지면 어긋나요)</p>
+      <div class="odombar">
+        <span id="odomTxt">x 0.00m · y 0.00m · 0°</span>
+        <button class="btn" id="odomReset" title="지금 자리를 원점으로, 지나온 길 지우기">원점</button>
+        <button class="btn on" id="odomFollow" title="시점이 로봇을 따라감">따라가기</button>
+      </div>
       <details id="adjBox">
         <summary style="cursor:pointer;font-size:13px;font-weight:800;letter-spacing:1.5px;
                         color:var(--dim);padding:7px 0">▸ 각도 보정 (실제와 다를 때)</summary>
@@ -250,11 +268,35 @@
       </div>
       <div id="joints"></div>
       <div class="hint">
-        <b>잠금</b> — 팔이 현재 자세를 유지. 아무것도 안 움직임<br>
-        <b>슬라이더</b> — 아래 막대로 관절을 직접 조종<br>
-        <b>리더팔</b> — 리더팔을 손으로 움직이면 그대로 따라옴<br>
+        <b>잠금</b> - 팔이 현재 자세를 유지. 아무것도 안 움직임<br>
+        <b>슬라이더</b> - 아래 막대로 관절을 직접 조종<br>
+        <b>리더팔</b> - 리더팔을 손으로 움직이면 그대로 따라옴<br>
         모드를 켤 때 <b>현재 자세부터 시작</b>하니 튀지 않음.
       </div>
+    </div>
+  </div>
+
+  <p class="sect" style="margin-top:18px">[ AUTO PICK ]</p>
+  <div class="panel" id="autoPanel">
+    <div class="row">
+      <button class="btn" data-auto="red">빨강 집기</button>
+      <button class="btn" data-auto="yellow">노랑 집기</button>
+      <button class="btn" data-auto="red,yellow">빨강 + 노랑</button>
+      <label class="autoopt"><input type="checkbox" id="autoOnce"> 한 개만</label>
+      <label class="autoopt"><input type="checkbox" id="autoSort"> 색깔별 분류 (빨강→A · 노랑→B)</label>
+      <button class="btn danger" id="autoStop">■ 멈춤</button>
+    </div>
+    <div class="steps" id="autoSteps">
+      <span>① 찾기</span><span>② 다가가기</span><span>③ 위치 맞추기</span>
+      <span>④ 집기</span><span>⑤ 보관함으로</span><span>⑥ 넣기</span>
+    </div>
+    <div class="tele" id="autoStatus">대기 중</div>
+    <pre id="autoLog"></pre>
+    <div class="hint">
+      버튼을 누르면 로봇이 블록을 찾아 집고 보관함에 넣어요. 보이는 블록이 없으면 스스로 멈춰요.<br>
+      <b>색깔별 분류</b>를 켜면 빨강은 보관함 A(마커 0~3), 노랑은 보관함 B(마커 4~7)에 넣어요.<br>
+      이동 중 앞에 <b>강아지 · 사람</b>이 가까이 오면 멈췄다가 비키면 다시 가요.<br>
+      자동 집기 중에는 <b>주행 · 팔 조종을 쓰지 마세요</b>. <b>■ 멈춤</b>이나 EMERGENCY STOP을 누르면 바로 서고 팔을 접어요.
     </div>
   </div>
 </main>
@@ -303,9 +345,46 @@ scene.add(new THREE.AmbientLight(0x226633, 1.4));
 const key = new THREE.DirectionalLight(0x66ff99, 1.5); key.position.set(1,2,1.5); scene.add(key);
 const rim = new THREE.DirectionalLight(0x00ff41, .9);  rim.position.set(-1.5,.6,-1); scene.add(rim);
 
-const grid = new THREE.GridHelper(1.4, 20, 0x0f8f2c, 0x063d12);
-grid.position.y = -0.001;
+// 바닥: 8m x 8m, 25cm 칸 + 1m 마다 밝은 선. 로봇이 이 위를 돌아다닌다(오도메트리).
+const grid = new THREE.GridHelper(8, 32, 0x0f8f2c, 0x063d12);
+grid.position.y = -0.002;
 scene.add(grid);
+const grid1m = new THREE.GridHelper(8, 8, 0x13b83a, 0x13b83a);
+grid1m.material.transparent = true; grid1m.material.opacity = .45;
+grid1m.position.y = -0.001;
+scene.add(grid1m);
+
+// 로봇 전체를 담아 바닥 위에서 옮기는 그룹.
+// 화면 좌표: 로봇 앞(x) = 화면 -z, 로봇 왼쪽(y) = 화면 -x, 반시계 회전 = rotation.y +
+const mover = new THREE.Group();
+scene.add(mover);
+let odom = [0, 0, 0], baseVel = [0, 0, 0], robotOn = false;
+const odomTo3 = (x, y) => [-y, -x];        // (앞 m, 왼쪽 m) → (화면 x, 화면 z)
+
+// 지나온 길
+const pathGeo = new THREE.BufferGeometry();
+const pathLine = new THREE.Line(pathGeo, new THREE.LineBasicMaterial({color: 0xffd23f}));
+pathLine.position.y = 0.004;
+scene.add(pathLine);
+// 선은 1px 라 격자에 묻힌다 → 2cm 마다 찍힌 점을 굵게 겹쳐 그린다
+const pathDots = new THREE.Points(pathGeo, new THREE.PointsMaterial({color: 0xffd23f, size: 5, sizeAttenuation: false}));
+pathDots.position.y = 0.004;
+scene.add(pathDots);
+// 원점 표시(원점 버튼을 누른 자리)
+const origin = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.045, 24), new THREE.MeshBasicMaterial({color: 0xffd23f, side: THREE.DoubleSide}));
+origin.rotation.x = -Math.PI / 2; origin.position.y = 0.003;
+scene.add(origin);
+async function loadPath(){
+  try{
+    const r = await (await fetch('/api/path')).json();
+    const pts = [];
+    for(const [x, y] of r.path){ const [a, b] = odomTo3(x, y); pts.push(a, 0, b); }
+    const [a, b] = odomTo3(r.odom[0], r.odom[1]); pts.push(a, 0, b);
+    pathGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    pathGeo.computeBoundingSphere();
+  }catch(e){}
+}
+setInterval(loadPath, 1000);
 
 function fit(){
   const w = view.clientWidth, h = view.clientHeight || 400;
@@ -357,7 +436,7 @@ async function buildModel(){
   const root = new THREE.Group();
   root.rotation.x = -Math.PI/2;
   root.add(linkGroups[rootName]);
-  scene.add(root);
+  mover.add(root);
 
   // 메시 로드
   const jobs = [];
@@ -390,7 +469,7 @@ async function buildModel(){
 
 buildModel().catch(e => {
   document.getElementById('loadMsg').textContent = '3D 모델 로드 실패: ' + e;
-});
+}).finally(() => startFeeds());
 
 // 시점
 let yaw = 0.9, pitch = 0.35, dist = 0.95, drag = null;
@@ -405,7 +484,7 @@ addEventListener('mousemove', e => {
 });
 view.addEventListener('wheel', e => {
   e.preventDefault();
-  dist = Math.max(0.3, Math.min(2.5, dist + e.deltaY * 0.0009));
+  dist = Math.max(0.3, Math.min(8, dist + e.deltaY * 0.0012 * Math.max(1, dist)));
 }, {passive:false});
 
 // 정규화값(-100~100) -> 실제 관절 각도(rad)
@@ -485,27 +564,38 @@ function toAngle(v, calibKey, jn){
 }
 
 let pose = {};        // 목표(로봇에서 온 값)
-let shown = {};       // 화면에 그려지는 값 — 목표를 향해 부드럽게 따라간다
+let shown = {};       // 화면에 그려지는 값 - 목표를 향해 부드럽게 따라간다
 let jointMap = [];
 
 // 세 옴니휠의 배치각에 맞춰 주행 명령을 각 바퀴 회전으로 바꾼다
 const WHEELS = [
-  {j:'base_left_wheel',  a: Math.PI * 4/3},
-  {j:'base_back_wheel',  a: 0},
-  {j:'base_right_wheel', a: Math.PI * 2/3},
+  {j:'base_left_wheel',  a: Math.PI * 4/3, k: 150},
+  {j:'base_back_wheel',  a: 0,             k: -90},
+  {j:'base_right_wheel', a: Math.PI * 2/3, k: 30},
 ];
+// 로봇이 잰 몸체 속도 → 바퀴 하나하나의 회전속도(rad/s). lerobot lekiwi.py 의 _body_to_wheel_raw 와 같은 식
+// (바퀴 반지름 0.05m, 중심~바퀴 0.125m, 배치각 [240, 0, 120] - 90 도)
+function wheelRadps(w){
+  const a = w.k * Math.PI / 180;
+  return (Math.cos(a) * baseVel[0] + Math.sin(a) * baseVel[1] + 0.125 * baseVel[2] * Math.PI / 180) / 0.05;
+}
+let lastFrame = performance.now();
+let follow = true;              // 시점이 로봇을 따라간다
+const look = new THREE.Vector3(0, 0.16, 0);
 
 function animate(){
   requestAnimationFrame(animate);
   fit();
   if(modelReady){
-    // 바퀴: 지금 주행 명령대로 굴린다
+    // 바퀴: 로봇과 연결돼 있으면 실제로 잰 속도로, 아니면 지금 주행 명령대로 굴린다
+    const dt = Math.min((performance.now() - lastFrame) / 1000, 0.1);
     const dv = driveVec();
     for(const w of WHEELS){
       const jn = jointNodes[w.j];
       if(!jn) continue;
-      const v = -Math.sin(w.a) * dv.x + Math.cos(w.a) * dv.y + dv.theta * 0.012;
-      jn.spin = (jn.spin || 0) + v * 0.9;
+      const v = robotOn ? wheelRadps(w) * dt
+                        : (-Math.sin(w.a) * dv.x + Math.cos(w.a) * dv.y + dv.theta * 0.012) * 0.9;
+      jn.spin = (jn.spin || 0) + v;
       jn.g.rotation.set(0,0,0);
       jn.g.rotateOnAxis(new THREE.Vector3(...jn.axis).normalize(), jn.spin);
     }
@@ -514,7 +604,7 @@ function animate(){
       if(!jn) continue;
       const tgt = pose[jm.key] ?? 0;
       if(shown[jm.key] === undefined) shown[jm.key] = tgt;
-      // 프레임마다 목표쪽으로 30%씩 — 폴링이 띄엄띄엄해도 움직임이 매끄럽다
+      // 프레임마다 목표쪽으로 30%씩 - 폴링이 띄엄띄엄해도 움직임이 매끄럽다
       shown[jm.key] += (tgt - shown[jm.key]) * 0.3;
       const ang = toAngle(shown[jm.key], jm.key.replace('.pos',''), jn);
       jn.g.rotation.set(0,0,0);
@@ -545,12 +635,24 @@ function animate(){
     }
 
   }
+  lastFrame = performance.now();
+  // 로봇을 바닥 위 위치로 옮긴다(받은 값 쪽으로 부드럽게)
+  const [tx, tz] = odomTo3(odom[0], odom[1]);
+  mover.position.x += (tx - mover.position.x) * 0.3;
+  mover.position.z += (tz - mover.position.z) * 0.3;
+  let dth = odom[2] - mover.rotation.y;
+  dth = Math.atan2(Math.sin(dth), Math.cos(dth));
+  mover.rotation.y += dth * 0.3;
+  // 시점: 따라가기면 로봇 중심을, 아니면 원점을 본다
+  look.lerp(follow ? new THREE.Vector3(mover.position.x, 0.16, mover.position.z) : new THREE.Vector3(0, 0.16, 0), 0.15);
   cam.position.set(
-    Math.sin(yaw)*Math.cos(pitch)*dist,
+    look.x + Math.sin(yaw)*Math.cos(pitch)*dist,
     Math.sin(pitch)*dist + 0.18,
-    Math.cos(yaw)*Math.cos(pitch)*dist
+    look.z + Math.cos(yaw)*Math.cos(pitch)*dist
   );
-  cam.lookAt(0, 0.16, 0);
+  cam.lookAt(look);
+  const od = document.getElementById('odomTxt');
+  if(od) od.textContent = `x ${odom[0].toFixed(2)}m · y ${odom[1].toFixed(2)}m · ${(odom[2]*180/Math.PI).toFixed(0)}°`;
   renderer.render(scene, cam);
 }
 fit(); animate();
@@ -637,8 +739,93 @@ $('#mOff').addEventListener('click', () => setMode('off'));
 $('#mManual').addEventListener('click', () => setMode('manual'));
 $('#mLeader').addEventListener('click', () => setMode('leader'));
 $('#eStop').addEventListener('click', async () => {
+  try{ await autoPost({action:'stop'}); }catch(e){}
   held.clear(); paint(); await sendDrive(); await setMode('off');
 });
+
+// ── 자동 집기 ──
+async function autoPost(body){
+  return (await fetch('/api/auto',{method:'POST',headers:{'Content-Type':'application/json'},
+                                   body:JSON.stringify(body)})).json();
+}
+document.querySelectorAll('[data-auto]').forEach(b => b.addEventListener('click', async () => {
+  const r = await autoPost({action:'start', colors:b.dataset.auto.split(','), once:$('#autoOnce').checked, sort:$('#autoSort').checked});
+  if(!r.ok) alertWarn(r.msg || '시작하지 못했어');
+}));
+$('#autoStop').addEventListener('click', () => autoPost({action:'stop'}));
+function alertWarn(t){ const w=$('#warn'); w.textContent=t; w.style.display='block'; setTimeout(()=>w.style.display='',4000); }
+const COLOR_KO = {red:'빨강', yellow:'노랑', green:'초록', blue:'파랑'};
+async function autoPoll(){
+  try{
+    const a = await (await fetch('/api/auto')).json();
+    document.querySelectorAll('#autoSteps span').forEach((s,i) => {
+      s.className = !a.running ? '' : (i === a.step ? 'on' : (i < a.step ? 'done' : ''));
+    });
+    document.querySelectorAll('[data-auto]').forEach(b => b.disabled = a.running);
+    const what = a.colors.map(c => COLOR_KO[c] || c).join(' + ');
+    $('#autoStatus').textContent = a.running
+      ? `자동 집기 중 (${what}${a.once?' · 한 개만':''}${a.sort?' · 색깔별 분류':''}) · ${a.elapsed}초 · 넣은 블록 ${a.placed}개`
+      : (a.lines.length ? `끝 · 넣은 블록 ${a.placed}개 · ${a.last.replace(/^\d\d:\d\d:\d\d /,'')}` : '대기 중');
+    const box = $('#autoLog'); const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+    box.textContent = a.lines.join('\n');
+    if(atEnd) box.scrollTop = box.scrollHeight;
+  }catch(e){}
+  setTimeout(autoPoll, 1000);
+}
+autoPoll();
+
+// ── Pi 전원 · 배터리 (상태줄과 같은 표시) ──
+function motorPct(v){ const c=v/3; const P=[[3.0,0],[3.3,8],[3.5,25],[3.7,50],[3.8,60],[4.0,85],[4.2,100]];
+  if(c<=3.0) return 0; if(c>=4.2) return 100;
+  for(let i=1;i<P.length;i++) if(c<=P[i][0]) return Math.round(P[i-1][1]+(c-P[i-1][0])/(P[i][0]-P[i-1][0])*(P[i][1]-P[i-1][1])); }
+async function powerPoll(){
+  try{
+    const p = await (await fetch('/api/power')).json();
+    const pi=$('#piStat'), ups=$('#upsStat'), mot=$('#motStat');
+    if(p.pi_on === false){
+      pi.textContent='⚫ PI 꺼짐'; pi.className='stat off'; ups.textContent='PI BATT --'; ups.className='stat';
+    }else if(p.pi_on){
+      pi.textContent='🟢 PI 켜짐'; pi.className='stat on';
+      if(p.ac === 'AC'){ ups.textContent=`⚡ 충전 중 (${p.ups_v.toFixed(2)}V)`; ups.className='stat on'; }
+      else if(p.ups_pct != null){ const u=Math.round(p.ups_pct);
+        ups.textContent=`${u<20?'🪫':'🔌'} PI ${u}% (${p.ups_v.toFixed(2)}V)`; ups.className='stat'+(u<20?' off':''); }
+    }
+    if(p.motor_v != null){ const old = p.motor_age > 360;
+      mot.textContent=`🔋 모터 ${motorPct(p.motor_v)}%${old?'?':''} (${p.motor_v.toFixed(1)}V)`;
+      mot.title = old ? '로봇 프로그램이 도는 동안은 포트 충돌을 피하려고 안 읽어요. 마지막 값이에요.' : ''; }
+  }catch(e){}
+  setTimeout(powerPoll, 5000);
+}
+powerPoll();
+
+// ── 카메라 영상 자동 재연결 ──
+// 서버를 다시 켜면 영상 연결이 끊기는데 <img> 는 스스로 다시 붙지 않아 화면이 멈춘 채 남았다(2026-10-06).
+// 끊기면(오류) 1초 뒤, 서버가 새로 켜졌으면 바로 다시 연결한다.
+// 영상은 3D 모델(STL 40개)을 다 받은 뒤에 켠다: 영상 하나가 브라우저 연결 하나를 계속 붙잡아서
+// 탭 두 개(영상 6개)면 연결 6개가 다 차 three.js · STL 이 영영 안 받아졌음(2026-10-07 "모델링이 안 보여요").
+// 모델이 20초 넘게 걸리면 영상부터 켠다.
+const feeds = [...document.querySelectorAll('img[data-src^="/stream/"]')];
+const feedBase = new Map(feeds.map(im => [im, im.dataset.src]));
+let feedsOn = false;
+function startFeeds(){ if(feedsOn) return; feedsOn = true; feeds.forEach(reconnect); }
+setTimeout(startFeeds, 20000);
+// 새로고침 · 탭 닫기 때 영상 연결을 끊는다: Chrome 은 흐르는 영상 <img> 연결을 그대로 남겨 두기도 해서
+// 새로고침할 때마다 3개씩 쌓여 결국 화면 · 상태 정보까지 막혔다(2026-10-07)
+addEventListener('pagehide', () => feeds.forEach(im => { im.removeAttribute('src'); im.src = 'data:,'; }));
+// 영상은 다른 주소 이름(localhost ↔ 127.0.0.1)으로 받는다: 브라우저의 '주소당 연결 6개' 제한을 따로 써서
+// 영상이 아무리 많아도(탭 여러 개) 3D 모델 · 상태 정보는 막히지 않게(2026-10-07)
+const FEED_ORIGIN = location.hostname === 'localhost' ? `http://127.0.0.1:${location.port}`
+                  : location.hostname === '127.0.0.1' ? `http://localhost:${location.port}` : '';
+function reconnect(im){ im.src = FEED_ORIGIN + feedBase.get(im) + '?t=' + Date.now(); }
+feeds.forEach(im => im.addEventListener('error', () => { if(feedsOn) setTimeout(() => reconnect(im), 1000); }));
+let lastBoot = null;
+setInterval(async () => {
+  try{
+    const r = await (await fetch('/api/state')).json();
+    if(feedsOn && lastBoot !== null && r.boot !== lastBoot) feeds.forEach(reconnect);
+    lastBoot = r.boot;
+  }catch(e){ /* 서버가 꺼져 있는 동안은 기다림 */ }
+}, 3000);
 
 function buildJoints(list, cur){
   if(joints.length) return;
@@ -708,11 +895,22 @@ async function syncArm(){
 }
 $('#armSync').addEventListener('click', syncArm);
 
+/* 바닥 위 위치: 원점 · 따라가기 */
+$('#odomReset').addEventListener('click', async () => {
+  await fetch('/api/odom_reset', {method:'POST'}); loadPath();
+});
+$('#odomFollow').addEventListener('click', e => {
+  follow = !follow; e.currentTarget.classList.toggle('on', follow);
+});
+
 /* 3D 트윈: 관절값만 빠르게 (20Hz) */
 setInterval(async () => {
   try{
     const p = await (await fetch('/api/pose')).json();
     if(p.c) pose = p.c;
+    if(p.o) odom = p.o;
+    if(p.v) baseVel = p.v;
+    robotOn = !!p.on;
   }catch(e){}
 }, 50);
 

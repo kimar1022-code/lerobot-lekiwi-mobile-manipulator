@@ -13,7 +13,9 @@ Pi 호스트 데몬이 먼저 떠 있어야 함:
 """
 import glob
 import os
+import signal
 import subprocess
+import sys
 import threading
 import time
 
@@ -93,6 +95,11 @@ class Shared:
         self.reconnects = 0        # 자동 재연결 횟수
         self.startup_msg = ""      # 원클릭 시작 진행 상황
         self.loop_count = 0        # 제어 루프가 돈 횟수
+        # 바닥 위 위치(오도메트리): 바퀴가 실제로 돈 속도를 쌓아서 출발점 기준 x(앞) · y(왼쪽) m, th 라디안
+        self.base_vel = {"x": 0.0, "y": 0.0, "theta": 0.0}   # m/s, m/s, 도/초 (바퀴 엔코더로 잰 값)
+        self.odom = [0.0, 0.0, 0.0]
+        self.path = [(0.0, 0.0)]   # 지나온 길(2cm 마다 한 점)
+        self.odom_t = None
         self.stop = False
 
 
@@ -101,12 +108,42 @@ app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+# ─── 오도메트리 ──────────────────────────────────────────────────────
+# 바퀴 엔코더로 잰 몸체 속도(x.vel · y.vel m/s, theta.vel 도/초)를 시간에 곱해 쌓는다.
+# 미끄러지거나 걸리면(충전기 선 등) 실제와 어긋난다 → 화면에서 '원점' 으로 다시 맞춘다.
+ODOM_DEAD = (0.004, 0.004, 0.6)      # 이보다 작은 속도는 0 (멈춰 있을 때 잡음이 쌓이지 않게)
+PATH_STEP = 0.02
+PATH_MAX = 5000
+
+
+def odom_update(obs):
+    vx, vy, wz = (float(obs.get(k, 0.0) or 0.0) for k in ("x.vel", "y.vel", "theta.vel"))
+    vx, vy, wz = (0.0 if abs(v) < d else v for v, d in zip((vx, vy, wz), ODOM_DEAD))
+    now = time.time()
+    with S.lock:
+        S.base_vel = {"x": vx, "y": vy, "theta": wz}
+        dt = 0.0 if S.odom_t is None else min(now - S.odom_t, 0.2)   # 끊겼다 이어지면 크게 건너뛰지 않게
+        S.odom_t = now
+        x, y, th = S.odom
+        th2 = th + np.radians(wz) * dt
+        tm = (th + th2) / 2                                   # 도는 중이면 가운데 각도로
+        x += (vx * np.cos(tm) - vy * np.sin(tm)) * dt
+        y += (vx * np.sin(tm) + vy * np.cos(tm)) * dt
+        S.odom = [x, y, float(np.arctan2(np.sin(th2), np.cos(th2)))]
+        px, py = S.path[-1]
+        if (x - px) ** 2 + (y - py) ** 2 >= PATH_STEP ** 2:
+            S.path.append((round(x, 3), round(y, 3)))
+            if len(S.path) > PATH_MAX:
+                S.path = S.path[::2]
+
+
 # ─── 로봇 제어 스레드 ────────────────────────────────────────────────
 def robot_loop():
     robot = None
     leader = None
     last_t = time.perf_counter()
     last_obs_ok = time.time()
+    last_sig = None
     smooth = 0.0
 
     while not S.stop:
@@ -183,7 +220,14 @@ def robot_loop():
         obs = None
         try:
             obs = robot.get_observation()
-            if obs:
+            # 클라이언트는 새 데이터가 안 와도 마지막 관측을 계속 돌려준다(Pi 재부팅 때 화면이
+            # 멈춘 채 '연결됨'으로 남았던 원인). 배 카메라 영상이 실제로 바뀔 때만 살아 있다고 본다.
+            fr = obs.get("front") if obs else None
+            if fr is not None:
+                sig = hash(fr[::16, ::16].tobytes())
+                if sig != last_sig:
+                    last_sig, last_obs_ok = sig, time.time()
+            elif obs:
                 last_obs_ok = time.time()
         except Exception as e:
             with S.lock:
@@ -195,7 +239,7 @@ def robot_loop():
             S.obs_age = age
         if age > OBS_TIMEOUT:
             with S.lock:
-                S.error = f"로봇 응답 없음({age:.0f}초) — 다시 연결하는 중"
+                S.error = f"로봇 응답 없음({age:.0f}초) - 다시 연결하는 중"
                 S.robot_on = False
                 S.reconnects += 1
             try:
@@ -212,6 +256,11 @@ def robot_loop():
             continue
 
         if obs:
+            if age < 0.5:                       # 관측이 살아 있을 때만 위치를 쌓는다
+                odom_update(obs)
+            else:
+                with S.lock:
+                    S.odom_t = None
             cur = {k: v for k, v in obs.items() if k.startswith("arm_")}
             front = to_jpeg(obs.get("front"), rotate=FRONT_ROTATE)
             wrist = to_jpeg(obs.get("wrist"), rotate=WRIST_ROTATE)
@@ -449,13 +498,102 @@ def api_arm():
     return jsonify(ok=True)
 
 
+# ─── 자동 집기 (pick/auto_pick.py 를 따로 띄워 관리) ───────────────────
+PICK_DIR = os.path.join(HERE, "pick")
+BOOT = time.time()     # 서버가 켜진 시각: 화면이 서버 재시작을 알아채 카메라를 다시 연결하는 데 씀
+AUTO = {"proc": None, "colors": [], "start": 0.0, "once": False, "sort": False, "log": "/tmp/lekiwi_auto.log", "fh": None}
+# 진행 단계: 로그 문구 → 화면 단계 번호 (0 찾기 · 1 다가가기 · 2 맞추기 · 3 집기 · 4 보관함 · 5 넣기)
+AUTO_STEPS = [("못 찾음", -1), ("시작", 0), ("돌아섬", 0), ("발견", 1), ("목표:", 1), ("정지선", 2), ("배캠 아래", 2),
+              ("넘겨받기", 2), ("정렬 완료", 3), ("집기 성공", 4), ("집기 실패", 2), ("보관함 마커", 4),
+              ("0.5m 지점", 4), ("정면 맞춤", 5), ("보관함 앞 도착", 5), ("넣기 완료", 0),
+              ("가까이 있어 멈춤", -2), ("다시 출발", 0), ("끝:", -1)]
+
+
+@app.route("/api/auto", methods=["GET", "POST"])
+def api_auto():
+    p = AUTO["proc"]
+    if request.method == "POST":
+        d = request.get_json(force=True, silent=True) or {}
+        act = d.get("action")
+        if act == "start":
+            if p and p.poll() is None:
+                return jsonify(ok=False, msg="이미 자동 집기 중")
+            colors = [c for c in d.get("colors", []) if c in ("red", "yellow", "green", "blue")] or ["red", "yellow"]
+            args = ([sys.executable, "-u", "auto_pick.py", *colors] + (["--once"] if d.get("once") else [])
+                    + (["--sort"] if d.get("sort") else []))
+            AUTO["fh"] = open(AUTO["log"], "w")
+            AUTO["proc"] = subprocess.Popen(args, cwd=PICK_DIR, stdout=AUTO["fh"], stderr=subprocess.STDOUT,
+                                            start_new_session=True)
+            AUTO.update(colors=colors, start=time.time(), once=bool(d.get("once")), sort=bool(d.get("sort")))
+        elif act == "stop":
+            if p and p.poll() is None:
+                p.send_signal(signal.SIGINT)      # auto_pick: Ctrl+C 를 받으면 바퀴 정지 + 홈 자세
+            with S.lock:                          # 서버 쪽에서도 바퀴를 바로 세운다
+                S.drive = {"x": 0.0, "y": 0.0, "theta": 0.0}
+                S.drive_stamp = 0.0
+        return jsonify(ok=True)
+    running = bool(p and p.poll() is None)
+    lines = []
+    try:
+        lines = [l.rstrip() for l in open(AUTO["log"], encoding="utf-8", errors="replace")
+                 if l.strip() and "terminate called" not in l and "Deprecation" not in l]
+    except OSError:
+        pass
+    step = -1
+    for l in lines:
+        for key, n in AUTO_STEPS:
+            if key in l:
+                step = n
+    return jsonify(running=running, colors=AUTO["colors"], once=AUTO["once"], sort=AUTO["sort"],
+                   elapsed=round(time.time() - AUTO["start"]) if AUTO["start"] else 0,
+                   placed=sum("넣기 완료" in l for l in lines), step=step if running else -1,
+                   last=lines[-1] if lines else "", lines=lines[-14:])
+
+
+# ─── Pi 전원 · 배터리 (10초마다 SSH 로 확인) ─────────────────────────
+POWER = {"pi_on": None, "ups_pct": None, "ups_v": None, "ac": None, "motor_v": None, "motor_ts": 0.0, "ts": 0.0}
+
+
+def power_loop():
+    import json as _json
+    while not S.stop:
+        try:
+            r = subprocess.run(
+                ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", SSH_HOST,
+                 "cat ~/lekiwi_power.json 2>/dev/null; echo; echo MOTOR:$(~/lerobot/.venv/bin/python ~/lekiwi_tools/read_batt.py 2>/dev/null)"],
+                capture_output=True, text=True, timeout=15)
+            ok = r.returncode == 0
+            POWER["pi_on"] = ok
+            if ok:
+                lines = r.stdout.splitlines()
+                if lines and lines[0].startswith("{"):
+                    j = _json.loads(lines[0])
+                    POWER.update(ups_pct=j.get("pct"), ups_v=j.get("volt"), ac=j.get("ac"))
+                m = next((l[6:].strip() for l in lines if l.startswith("MOTOR:")), "")
+                if m:   # 로봇 호스트가 돌 때는 포트 충돌을 피하려고 안 읽으므로 비어 있다 → 마지막 값 유지
+                    POWER.update(motor_v=float(m), motor_ts=time.time())
+        except Exception:
+            POWER["pi_on"] = False
+        POWER["ts"] = time.time()
+        time.sleep(10)   # 충전기 뽑음 · 꽂음을 빨리 보여 주려고 10초 (원래 30초)
+
+
+@app.route("/api/power")
+def api_power():
+    p = dict(POWER)
+    return jsonify(**p, motor_age=round(time.time() - p["motor_ts"]) if p["motor_ts"] else None)
+
+
 @app.route("/api/pose")
 def api_pose():
-    """3D 트윈용. 관절값만 담아 가볍게 — 빠른 주기로 폴링해도 부담이 적다."""
+    """3D 트윈용. 관절값만 담아 가볍게 - 빠른 주기로 폴링해도 부담이 적다."""
     with S.lock:
         return jsonify(
             c={k: round(v, 2) for k, v in S.arm_current.items()},
             l={k: round(v, 2) for k, v in S.leader_pose.items()} if S.leader_on else {},
+            v=[round(S.base_vel[k], 4) for k in ("x", "y", "theta")],   # 바퀴로 잰 몸체 속도
+            o=[round(v, 4) for v in S.odom],                            # 바닥 위 위치 x · y(m) · 방향(rad)
+            on=S.robot_on,
         )
 
 
@@ -536,6 +674,7 @@ def api_state():
             want_robot=S.want_robot,
             want_leader=S.want_leader,
             arm_mode=S.arm_mode,
+            boot=BOOT,
             error=S.error,
             leader_error=S.leader_error,
             fps=round(S.fps_actual, 1),
@@ -548,7 +687,26 @@ def api_state():
             arm_target={k: round(v, 2) for k, v in S.arm_target.items()},
             leader_pose={k: round(v, 2) for k, v in S.leader_pose.items()},
             joints=[{"key": k, "label": lab, "urdf": u} for k, lab, u in ARM_JOINTS],
+            base_vel={k: round(v, 4) for k, v in S.base_vel.items()},
+            odom=[round(v, 4) for v in S.odom],
+            path_len=len(S.path),
         )
+
+
+@app.route("/api/path")
+def api_path():
+    """지나온 길 전체(화면이 1초마다 가져가 선으로 그린다)"""
+    with S.lock:
+        return jsonify(path=S.path, odom=[round(v, 4) for v in S.odom])
+
+
+@app.route("/api/odom_reset", methods=["POST"])
+def api_odom_reset():
+    """지금 자리를 원점(0, 0, 0°)으로"""
+    with S.lock:
+        S.odom = [0.0, 0.0, 0.0]
+        S.path = [(0.0, 0.0)]
+    return jsonify(ok=True)
 
 
 @app.route("/")
@@ -582,6 +740,7 @@ def _cache_static(resp):
 def main():
     threading.Thread(target=robot_loop, daemon=True).start()
     threading.Thread(target=desk_cam_loop, daemon=True).start()
+    threading.Thread(target=power_loop, daemon=True).start()
     print(f"웹 GUI: http://localhost:{WEB_PORT}   (로봇 {PI_IP})")
     try:
         app.run(host="0.0.0.0", port=WEB_PORT, threaded=True, debug=False)
