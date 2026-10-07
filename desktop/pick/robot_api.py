@@ -79,7 +79,7 @@ def arm_mode(mode):
 
 
 def arm_target(joints):
-    """joints: {"arm_shoulder_pan.pos": 값, ...} — manual 모드에서만 반영."""
+    """joints: {"arm_shoulder_pan.pos": 값, ...} - manual 모드에서만 반영."""
     return requests.post(f"{BASE}/api/arm", json={"joints": joints}, timeout=2).json()
 
 
