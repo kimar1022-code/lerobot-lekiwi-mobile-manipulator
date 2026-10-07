@@ -5,7 +5,9 @@
   0x02 VCELL : 셀 전압
   0x04 SOC   : 남은 용량(%)
 
-출력:  <퍼센트> <전압>
+출력:  <퍼센트> <전압> <AC|BAT|?>
+  세 번째 칸: X1200 의 정전 감지 핀(GPIO6)으로 본 충전기 연결 여부. AC=꽂힘(충전 중), BAT=배터리만.
+  충전 중에는 충전기가 전압을 밀어 올려 전압환산 %가 실제보다 높게 나온다(2026-10-06 4%→68%).
 SOC 레지스터가 엉뚱한 값을 줄 때가 있어(리셋 직후 학습 전) 전압으로도 계산해
 둘 중 더 그럴듯한 값을 쓴다.
 
@@ -62,4 +64,28 @@ if DEBUG:
     print(f'  원본 VCELL=0x{raw_v:04x}->{v}  SOC=0x{raw_s:04x}->{s}')
     print(f'  전압 {volt:.2f}V  |  SOC레지스터 {soc:.1f}%  |  전압환산 {vp:.1f}%  ->  {why} 사용')
 
-print(f'{use:.1f} {volt:.2f}')
+def ac_state():
+    # gpiod 는 lerobot venv 에만 있다. 시스템 python 으로 실행돼도 찾아가게 한다.
+    try:
+        import gpiod
+    except ImportError:
+        import glob, os
+        hits = glob.glob(os.path.expanduser("~/lerobot/.venv/lib/python3*/site-packages"))
+        if hits:
+            sys.path.insert(0, hits[0])
+        try:
+            import gpiod
+        except ImportError:
+            return "?"
+    try:
+        from gpiod.line import Direction, Value
+        with gpiod.request_lines("/dev/gpiochip4", consumer="ups-pld",
+                                 config={6: gpiod.LineSettings(direction=Direction.INPUT)}) as req:
+            return "AC" if req.get_value(6) == Value.ACTIVE else "BAT"
+    except Exception:
+        return "?"
+
+ac = ac_state()
+if DEBUG:
+    print(f'  충전기: {ac}')
+print(f'{use:.1f} {volt:.2f} {ac}')

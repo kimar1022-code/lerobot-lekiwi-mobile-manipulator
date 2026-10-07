@@ -19,8 +19,8 @@ case "${1:-}" in
   -s|--status)
     pgrep -f host_watchdog > /dev/null && echo "자동 재시작 감시: 켜짐" || echo "자동 재시작 감시: 꺼짐"
     [ -f ~/lekiwi_restarts.log ] && { echo "--- 최근 재시작 ---"; tail -3 ~/lekiwi_restarts.log; }
-    if pgrep -f '^./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host' > /dev/null; then
-      echo "돌고 있음 (PID $(pgrep -f '^./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host' | tr '\n' ' '))"
+    if pgrep -f '^./.venv/bin/python .*lekiwi_host' > /dev/null; then
+      echo "돌고 있음 (PID $(pgrep -f '^./.venv/bin/python .*lekiwi_host' | tr '\n' ' '))"
       echo "--- 로그 마지막 10줄 ---"; tail -10 "$LOG" 2>/dev/null
     else
       echo "안 돌고 있음"
@@ -36,14 +36,15 @@ pkill -f host_watchdog 2>/dev/null || true
 pkill -f lekiwi_host 2>/dev/null || true
 sleep 1
 
-CMD=(./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host
+# lekiwi_host_plus.py = 원래 호스트 + 모터 배터리 전압을 10초마다 ~/lekiwi_motor_v.txt 에 기록
+CMD=(./.venv/bin/python /home/ar/lekiwi_tools/lekiwi_host_plus.py
      --robot.id="$ROBOT_ID" --host.connection_time_s="$CONN_TIME")
 
 if [ "${1:-}" = "-b" ] || [ "${1:-}" = "--background" ]; then
   : > "$LOG"
   setsid nohup ~/lekiwi_tools/host_watchdog.sh "${CMD[@]}" > /dev/null 2>&1 < /dev/null &
   sleep 6
-  if pgrep -f '^./.venv/bin/python -m lerobot.robots.lekiwi.lekiwi_host' > /dev/null; then
+  if pgrep -f '^./.venv/bin/python .*lekiwi_host' > /dev/null; then
     echo "백그라운드로 시작됨 (연결시간 ${CONN_TIME}초)"
     echo "로그: tail -f $LOG"
     tail -8 "$LOG" 2>/dev/null
